@@ -1,0 +1,48 @@
+{
+  "summary": "Frontend-only testing of Agenda Excel-like timetable refactor. Login (PIN 0000 + sucursal Centro) lands on /agenda; grid renders with 2 specialists × 13 hour rows, 3 seeded citas, add-cell '+' buttons on empty slots, sticky headers on scroll, rowSpan for 90-min cita (14:00-15:30 spans 2 rows, covered hour 15 has no td/add-cell), date picker + HOY + filter-by-specialist all functional, modal opens from add-cell with specialist_id and start_time prefilled, and from header btn empty. End-to-end creation (service, cliente, submit CONFIRMAR CITA), Iniciar/Finalizar/Eliminar actions all work. One UX bug found in the modal that partially defeats the preselect feature.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "NewAppointmentModal.jsx (line 163)",
+        "issue": "Clicking a service button resets startTime to '' (onClick={() => { setServiceId(s.id); setStartTime(''); }}). This erases the time preselected when the modal was opened from an add-cell in the grid, forcing the user to re-enter the hour every time. Breaks the UX contract of the refactor (specialist_id + hora preseleccionados por props).",
+        "selector": "[data-testid^='modal-service-']",
+        "priority": "HIGH"
+      },
+      {
+        "component": "DailyAgenda.jsx (add-cell buttons)",
+        "issue": "Add-cell '+' buttons are rendered for hours outside the specialist's working window (e.g., 08:00 when specialist shift is 09:00-18:00). Clicking one opens the modal with a time that the backend will reject with 400 'Horario fuera del turno del especialista'. Should be disabled or hidden for out-of-shift hours.",
+        "selector": "[data-testid^='add-cell-']",
+        "priority": "MEDIUM"
+      },
+      {
+        "component": "NewAppointmentModal Dialog",
+        "issue": "Accessibility warning: 'Missing Description or aria-describedby' for DialogContent (radix-ui warning on console).",
+        "selector": "[data-testid='new-appointment-modal']",
+        "priority": "LOW"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Fix NewAppointmentModal.jsx line 163: when selecting a service, do NOT reset startTime. Only reset if the current startTime is no longer valid for the new service duration. Quick patch: onClick={() => setServiceId(s.id)}.",
+    "Consider disabling/hiding add-cell '+' buttons for hours outside each specialist's start_time/end_time window so users cannot open the modal with invalid hours.",
+    "Add a DialogDescription (or aria-describedby) inside NewAppointmentModal to silence radix accessibility warning."
+  ],
+  "critical_code_review_comments": [
+    "NewAppointmentModal.jsx line 163 resets startTime on service click — this directly breaks the preselected-time UX added by the refactor.",
+    "DailyAgenda.jsx does not filter HOURS or disable add-cell buttons by sp.start_time / sp.end_time — backend 400 errors are surfaced to the user only via toast.",
+    "Covered cells correctly return null to allow rowSpan to work (cell-{sp}-15 absent). Good.",
+    "Sticky positioning verified: th has position:sticky top:0px, first column td left:0. Works correctly."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "not tested", "frontend": "90% (11/12 scenarios pass; 1 UX bug in modal service click resets preselected time)"},
+  "test_credentials": "PIN 0000 (documented). Sucursal Centro has 2 specialists (Sofía Vargas - Colorimetría, Lucía Martín - Peinado & Corte) and 3 seeded citas on today (2026-05-07).",
+  "seed_data_creation": "Created/deleted a 'TEST Cliente Playwright' appointment during testing; cleaned up via delete action.",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "All data-testids in the grid/modal work. When retesting modal preselect, note that clicking modal-service-{id} currently wipes the start_time input — either fix first or re-fill modal-start-time-input manually in the test. Specialist shift is 09:00-18:00 in seed data, so avoid 08:00 and 18:00-20:00 cells when submitting. Covered rowSpan cell testids do NOT exist (null td), so don't assert their presence.",
+  "rca of the issue": "Root cause of modal startTime reset: line 163 of /app/frontend/src/components/NewAppointmentModal.jsx clears startTime whenever a service is selected, presumably to force the user to pick a fresh slot compatible with the new duration. But this also fires on the very first service pick after the modal was opened via add-cell, blowing away the preselected hour. Mitigation: drop the setStartTime('') from the service button's onClick, or only reset if the currently-selected time produces a conflict given the new service duration."
+}
