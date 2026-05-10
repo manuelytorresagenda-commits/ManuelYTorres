@@ -69,17 +69,6 @@ export default function MyAgenda() {
 
   const findService = (id) => services.find((s) => s.id === id);
 
-  const grouped = useMemo(() => {
-    const map = {};
-    SLOTS.forEach((s) => (map[s] = []));
-    appointments.forEach((a) => {
-      const startMin = timeToMin(a.start_time);
-      const slot = Math.floor(startMin / 30) * 30;
-      if (map[slot]) map[slot].push(a);
-    });
-    return map;
-  }, [appointments]);
-
   const days = useMemo(
     () => Array.from({ length: 7 }, (_, i) => {
       const d = new Date(weekStart); d.setDate(d.getDate() + i); return d;
@@ -185,57 +174,79 @@ export default function MyAgenda() {
               <div className="font-mono-label text-[10px] text-neutral-500 mb-4">
                 {appointments.length} CITA{appointments.length !== 1 ? "S" : ""} HOY
               </div>
-              {SLOTS.map((slotMin) => {
-                const items = grouped[slotMin] || [];
-                const hh = Math.floor(slotMin / 60);
-                const mm = slotMin % 60;
-                return (
-                  <div key={slotMin} className="grid grid-cols-[80px_1fr] gap-6 border-t border-neutral-200 py-4 first:border-t-0">
-                    <div className="font-serif-display text-3xl text-neutral-400 leading-none pt-1">
-                      {String(hh).padStart(2, "0")}<span className="text-base align-top">:{String(mm).padStart(2, "0")}</span>
-                    </div>
-                    <div className="space-y-2">
-                      {items.length === 0 ? (
-                        <div className="h-12 border-l border-dashed border-neutral-300" />
-                      ) : (
-                        items
-                          .sort((a, b) => a.start_time.localeCompare(b.start_time))
-                          .map((a) => {
-                            const sv = findService(a.service_id);
-                            const serviceLabel = a.is_floating
-                              ? a.custom_service_name
-                              : (sv?.name || "—");
-                            return (
-                              <div key={a.id} data-testid={`my-appt-${a.id}`}
-                                   className={`border ${STATUS_STYLES[a.status]} p-4 lg:p-5`}>
-                                <div className="flex items-center gap-3 mb-1">
-                                  <Clock className="w-3 h-3" strokeWidth={1.5} />
-                                  <span className="font-mono-label text-[10px]">
-                                    {a.start_time} — {a.end_time} · {a.status}
-                                  </span>
-                                  {a.is_floating && (
-                                    <span className="font-mono-label text-[8px] bg-sky-400 text-black px-1.5 py-0.5 border border-black">
-                                      FLOTANTE
+              {(() => {
+                const dayGrid = buildOverlapGrid(appointments);
+                const ROW_H = 96; // px per 30-min slot
+                return SLOTS.map((slotMin) => {
+                  const hh = Math.floor(slotMin / 60);
+                  const mm = slotMin % 60;
+                  const cluster = dayGrid.startsAt.get(slotMin);
+                  return (
+                    <div
+                      key={slotMin}
+                      style={{ height: ROW_H }}
+                      className="relative grid grid-cols-[80px_1fr] gap-6 border-t border-neutral-200 first:border-t-0"
+                      data-testid={`my-day-row-${minToTime(slotMin)}`}
+                    >
+                      <div className="font-serif-display text-3xl text-neutral-400 leading-none pt-3">
+                        {String(hh).padStart(2, "0")}<span className="text-base align-top">:{String(mm).padStart(2, "0")}</span>
+                      </div>
+                      <div className="relative">
+                        {cluster && cluster.appts.length > 0 && (
+                          <div
+                            style={{
+                              position: "absolute",
+                              top: 6,
+                              left: 0,
+                              right: 0,
+                              height: cluster.span * ROW_H - 12,
+                            }}
+                            className="flex flex-col gap-2 z-10"
+                          >
+                            {cluster.appts.map((a) => {
+                              const sv = findService(a.service_id);
+                              const serviceLabel = a.is_floating
+                                ? a.custom_service_name
+                                : (sv?.name || "—");
+                              return (
+                                <div
+                                  key={a.id}
+                                  data-testid={`my-appt-${a.id}`}
+                                  className={`border ${STATUS_STYLES[a.status]} p-4 lg:p-5 flex-1 min-h-0 overflow-hidden`}
+                                >
+                                  <div className="flex items-center gap-3 mb-1">
+                                    <Clock className="w-3 h-3" strokeWidth={1.5} />
+                                    <span className="font-mono-label text-[10px]">
+                                      {a.start_time} — {a.end_time} · {a.status}
                                     </span>
-                                  )}
-                                  {a.is_overbooked && !a.is_floating && (
-                                    <span className="font-mono-label text-[8px] bg-amber-400 text-black px-1.5 py-0.5 border border-black">
-                                      EXTRA
-                                    </span>
-                                  )}
+                                    {a.is_floating && (
+                                      <span className="font-mono-label text-[8px] bg-sky-400 text-black px-1.5 py-0.5 border border-black">
+                                        FLOTANTE
+                                      </span>
+                                    )}
+                                    {a.is_overbooked && !a.is_floating && (
+                                      <span className="font-mono-label text-[8px] bg-amber-400 text-black px-1.5 py-0.5 border border-black">
+                                        EXTRA
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="font-serif-display text-2xl lg:text-3xl leading-tight truncate">
+                                    {a.client_name}
+                                  </div>
+                                  <div className="text-sm mt-1 opacity-80 truncate">{serviceLabel}</div>
                                 </div>
-                                <div className="font-serif-display text-2xl lg:text-3xl leading-tight">
-                                  {a.client_name}
-                                </div>
-                                <div className="text-sm mt-1 opacity-80">{serviceLabel}</div>
-                              </div>
-                            );
-                          })
-                      )}
+                              );
+                            })}
+                          </div>
+                        )}
+                        {!cluster && !dayGrid.coveredSlots.has(slotMin) && (
+                          <div className="h-full border-l border-dashed border-neutral-200" aria-hidden />
+                        )}
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                });
+              })()}
             </div>
           )
         ) : (
