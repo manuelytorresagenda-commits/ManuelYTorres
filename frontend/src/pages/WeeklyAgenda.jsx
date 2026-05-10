@@ -5,6 +5,7 @@ import { fetchAppointments, fetchSpecialists, fetchServices } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
+import { SLOTS, minToTime, buildOverlapGrid } from "../lib/scheduling";
 
 function startOfWeek(d) {
   const date = new Date(d);
@@ -21,7 +22,7 @@ function timeToMin(t) {
 }
 
 const DAYS_ES = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
-const HOURS = Array.from({ length: 13 }, (_, i) => 8 + i);
+// SLOTS / minToTime imported from ../lib/scheduling
 
 export default function WeeklyAgenda() {
   const [weekStart, setWeekStart] = useState(startOfWeek(new Date()));
@@ -70,32 +71,18 @@ export default function WeeklyAgenda() {
   const findSp = (id) => specialists.find((s) => s.id === id);
   const findSv = (id) => services.find((s) => s.id === id);
 
-  // Build per-day grid: { [dateStr]: { startsAt: Map(hour->[appts]), coveredHours: Set } }
+  // Build per-day overlap grid (clusters merge overlapping appts so extras /
+  // floating that start mid-way through a primary still render).
   const grid = useMemo(() => {
     const result = {};
     days.forEach((d) => {
       const ds = d.toISOString().slice(0, 10);
-      result[ds] = { startsAt: new Map(), coveredHours: new Set() };
-    });
-    appointments.forEach((a) => {
-      if (filterSpecialist !== "all" && a.specialist_id !== filterSpecialist) return;
-      if (!result[a.date]) return;
-      const startMin = timeToMin(a.start_time);
-      const endMin = timeToMin(a.end_time);
-      const startHour = Math.floor(startMin / 60);
-      const endHour = Math.ceil(endMin / 60);
-      const span = Math.max(1, endHour - startHour);
-      const list = result[a.date].startsAt.get(startHour) || [];
-      list.push({ appt: a, span });
-      result[a.date].startsAt.set(startHour, list);
-    });
-    Object.values(result).forEach((bucket) => {
-      bucket.startsAt.forEach((list, startHour) => {
-        const maxSpan = list.reduce((m, x) => Math.max(m, x.span), 1);
-        for (let h = startHour + 1; h < startHour + maxSpan; h++) {
-          bucket.coveredHours.add(h);
-        }
+      const apptsForDay = appointments.filter((a) => {
+        if (a.date !== ds) return false;
+        if (filterSpecialist !== "all" && a.specialist_id !== filterSpecialist) return false;
+        return true;
       });
+      result[ds] = buildOverlapGrid(apptsForDay);
     });
     return result;
   }, [appointments, days, filterSpecialist]);
@@ -163,31 +150,43 @@ export default function WeeklyAgenda() {
                 </tr>
               </thead>
               <tbody>
-                {HOURS.map((h) => (
-                  <tr key={h}>
+                {SLOTS.map((slotMin) => {
+                  const timeLabel = minToTime(slotMin);
+                  return (
+                  <tr key={slotMin}>
                     <td className="border-b border-r border-neutral-200 p-2 align-top font-mono-label text-[9px] text-neutral-500">
-                      {String(h).padStart(2, "0")}:00
+                      {timeLabel}
                     </td>
                     {days.map((d, i) => {
                       const ds = d.toISOString().slice(0, 10);
                       const bucket = grid[ds];
                       if (!bucket) {
                         return (
-                          <td key={i} className="border-b border-r border-neutral-200 last:border-r-0 p-1 align-top h-[60px]" />
+                          <td key={i} className="border-b border-r border-neutral-200 last:border-r-0 p-1 align-top h-[30px]" />
                         );
                       }
-                      if (bucket.coveredHours.has(h)) return null;
-                      const list = bucket.startsAt.get(h) || [];
-                      const maxSpan = list.reduce((m, x) => Math.max(m, x.span), 0);
+                      if (bucket.coveredSlots.has(slotMin)) return null;
+                      const cluster = bucket.startsAt.get(slotMin);
+                      const apptList = cluster ? cluster.appts : [];
+                      const maxSpan = cluster ? cluster.span : 0;
+                      const groupCount = apptList.length;
                       return (
                         <td
                           key={i}
                           rowSpan={maxSpan || 1}
-                          className="border-b border-r border-neutral-200 last:border-r-0 p-1 align-top h-[60px]"
-                          data-testid={`week-cell-${ds}-${h}`}
+                          className="border-b border-r border-neutral-200 last:border-r-0 p-1 align-top h-[30px] relative"
+                          data-testid={`week-cell-${ds}-${timeLabel}`}
                         >
+                          {groupCount > 1 && (
+                            <span
+                              data-testid={`week-cell-count-${ds}-${timeLabel}`}
+                              className="absolute top-0.5 right-0.5 z-10 font-mono-label text-[7px] bg-black text-white px-1 border border-black"
+                            >
+                              ×{groupCount}
+                            </span>
+                          )}
                           <div className="flex flex-col gap-1 h-full">
-                            {list.map(({ appt: a }) => {
+                            {apptList.map((a) => {
                               const sv = findSv(a.service_id);
                               const sp = findSp(a.specialist_id);
                               const cls = a.is_floating
@@ -238,7 +237,8 @@ export default function WeeklyAgenda() {
                       );
                     })}
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>

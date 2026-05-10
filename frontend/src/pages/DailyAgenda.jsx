@@ -14,8 +14,9 @@ import {
 import { useAuth } from "../context/AuthContext";
 import { Plus, Trash2, Play, CheckCircle2, Calendar, Wind } from "lucide-react";
 import { toast } from "sonner";
+import { SLOTS, timeToMin, minToTime, buildOverlapGrid } from "../lib/scheduling";
 
-const HOURS = Array.from({ length: 13 }, (_, i) => 8 + i); // 08..20
+// Half-hour slots (08:00 — 20:30) and time helpers come from ../lib/scheduling.
 
 const STATUS_STYLES = {
   Confirmada: "bg-white border-black text-black",
@@ -35,10 +36,7 @@ const FLOATING_STYLES = {
   Finalizada: "bg-sky-50 border-neutral-400 text-neutral-500 line-through border-dashed",
 };
 
-function timeToMin(t) {
-  const [h, m] = t.split(":").map(Number);
-  return h * 60 + m;
-}
+// timeToMin imported from ../lib/scheduling
 
 export default function DailyAgenda() {
   const [appointments, setAppointments] = useState([]);
@@ -88,32 +86,17 @@ export default function DailyAgenda() {
     return appointments.filter((a) => a.specialist_id === filterSpecialist);
   }, [appointments, filterSpecialist]);
 
-  // Build a per-specialist map: { [specialistId]: { startsAt: Map(hour->Array<{appt, span}>), coveredHours: Set(hours) } }
-  // Multiple appointments can share the same starting hour (overbooking/extras).
+  // Build a per-specialist overlap grid using shared helper. Multiple
+  // appointments that overlap (incl. extras / floating) collapse into a single
+  // anchored cluster so they ALL render even if they start mid-way through a
+  // primary appointment.
   const grid = useMemo(() => {
     const result = {};
     visibleSpecialists.forEach((sp) => {
-      result[sp.id] = { startsAt: new Map(), coveredHours: new Set() };
-    });
-    filteredAppointments.forEach((a) => {
-      if (!result[a.specialist_id]) return;
-      const startMin = timeToMin(a.start_time);
-      const endMin = timeToMin(a.end_time);
-      const startHour = Math.floor(startMin / 60);
-      const endHour = Math.ceil(endMin / 60);
-      const spanRows = Math.max(1, endHour - startHour);
-      const list = result[a.specialist_id].startsAt.get(startHour) || [];
-      list.push({ appt: a, span: spanRows });
-      result[a.specialist_id].startsAt.set(startHour, list);
-    });
-    // Compute coveredHours from the max span at each starting hour
-    Object.values(result).forEach((bucket) => {
-      bucket.startsAt.forEach((list, startHour) => {
-        const maxSpan = list.reduce((m, x) => Math.max(m, x.span), 1);
-        for (let h = startHour + 1; h < startHour + maxSpan; h++) {
-          bucket.coveredHours.add(h);
-        }
-      });
+      const apptsForSp = filteredAppointments.filter(
+        (a) => a.specialist_id === sp.id
+      );
+      result[sp.id] = buildOverlapGrid(apptsForSp);
     });
     return result;
   }, [filteredAppointments, visibleSpecialists]);
@@ -139,9 +122,9 @@ export default function DailyAgenda() {
     }
   };
 
-  const openModal = (specialistId, hour) => {
+  const openModal = (specialistId, slotMin) => {
     setModalSpecialistId(specialistId);
-    setModalStartTime(`${String(hour).padStart(2, "0")}:00`);
+    setModalStartTime(minToTime(slotMin));
     setModalOpen(true);
   };
 
@@ -168,7 +151,7 @@ export default function DailyAgenda() {
         description={
           activeSpecialist
             ? `Citas asignadas a ${activeSpecialist.name} (${activeSpecialist.specialty}) para hoy.`
-            : "Cuadrícula de horarios. Cada columna es un especialista, cada fila un bloque de 60 min."
+            : "Cuadrícula de horarios. Cada columna es un especialista, cada fila un bloque de 30 min."
         }
         action={
           <div className="flex items-center gap-2">
@@ -291,33 +274,47 @@ export default function DailyAgenda() {
                 </tr>
               </thead>
               <tbody>
-                {HOURS.map((h) => (
-                  <tr key={h} data-testid={`row-hour-${h}`} className="align-top">
+                {SLOTS.map((slotMin) => {
+                  const hh = Math.floor(slotMin / 60);
+                  const mm = slotMin % 60;
+                  const timeLabel = minToTime(slotMin);
+                  return (
+                  <tr key={slotMin} data-testid={`row-slot-${timeLabel}`} className="align-top">
                     <td
                       className="sticky left-0 z-10 bg-white border-r border-b border-neutral-200 p-3 font-serif-display text-2xl text-neutral-400 leading-none"
                     >
-                      {String(h).padStart(2, "0")}
-                      <span className="text-xs align-top">:00</span>
+                      {String(hh).padStart(2, "0")}
+                      <span className="text-xs align-top">:{String(mm).padStart(2, "0")}</span>
                     </td>
                     {visibleSpecialists.map((sp) => {
                       const cell = grid[sp.id];
                       if (!cell) return null;
-                      if (cell.coveredHours.has(h)) {
+                      if (cell.coveredSlots.has(slotMin)) {
                         // covered by a previous-row appointment via rowSpan
                         return null;
                       }
-                      const slots = cell.startsAt.get(h);
-                      if (slots && slots.length > 0) {
-                        const maxSpan = slots.reduce((m, x) => Math.max(m, x.span), 1);
+                      const cluster = cell.startsAt.get(slotMin);
+                      if (cluster && cluster.appts.length > 0) {
+                        const maxSpan = cluster.span;
+                        const groupCount = cluster.appts.length;
                         return (
                           <td
                             key={sp.id}
                             rowSpan={maxSpan}
-                            data-testid={`cell-${sp.id}-${h}`}
-                            className="border-r border-b border-neutral-200 p-2"
+                            data-testid={`cell-${sp.id}-${timeLabel}`}
+                            className="border-r border-b border-neutral-200 p-2 relative"
                           >
+                            {groupCount > 1 && (
+                              <span
+                                data-testid={`cell-count-${sp.id}-${timeLabel}`}
+                                className="absolute top-1 right-1 z-10 font-mono-label text-[8px] bg-black text-white px-1.5 py-0.5 border border-black"
+                                aria-label={`${groupCount} citas en este bloque`}
+                              >
+                                ×{groupCount}
+                              </span>
+                            )}
                             <div className="flex flex-col gap-2 h-full">
-                              {slots.map(({ appt: a }) => {
+                              {cluster.appts.map((a) => {
                                 const sv = findService(a.service_id);
                                 const styles = a.is_floating
                                   ? FLOATING_STYLES[a.status]
@@ -420,17 +417,17 @@ export default function DailyAgenda() {
                       return (
                         <td
                           key={sp.id}
-                          data-testid={`cell-${sp.id}-${h}`}
-                          className="border-r border-b border-neutral-200 p-2 h-20"
+                          data-testid={`cell-${sp.id}-${timeLabel}`}
+                          className="border-r border-b border-neutral-200 p-2 h-10"
                         >
                           {(() => {
-                            const shiftStart = parseInt(sp.start_time.split(":")[0]);
-                            const shiftEnd = parseInt(sp.end_time.split(":")[0]);
-                            const outOfShift = h < shiftStart || h >= shiftEnd;
+                            const shiftStart = timeToMin(sp.start_time);
+                            const shiftEnd = timeToMin(sp.end_time);
+                            const outOfShift = slotMin < shiftStart || slotMin >= shiftEnd;
                             if (outOfShift) {
                               return (
                                 <div
-                                  data-testid={`out-of-shift-${sp.id}-${h}`}
+                                  data-testid={`out-of-shift-${sp.id}-${timeLabel}`}
                                   className="w-full h-full bg-neutral-50 border border-dashed border-neutral-100"
                                   aria-label="Fuera de turno"
                                 />
@@ -439,10 +436,10 @@ export default function DailyAgenda() {
                             return (
                               <button
                                 type="button"
-                                data-testid={`add-cell-${sp.id}-${h}`}
-                                onClick={() => openModal(sp.id, h)}
+                                data-testid={`add-cell-${sp.id}-${timeLabel}`}
+                                onClick={() => openModal(sp.id, slotMin)}
                                 className="w-full h-full flex items-center justify-center text-neutral-300 hover:text-black hover:bg-neutral-50 border border-dashed border-neutral-200 hover:border-black transition-colors"
-                                aria-label={`Agendar ${sp.name} a las ${h}:00`}
+                                aria-label={`Agendar ${sp.name} a las ${timeLabel}`}
                               >
                                 <Plus className="w-4 h-4" strokeWidth={1.5} />
                               </button>
@@ -452,7 +449,8 @@ export default function DailyAgenda() {
                       );
                     })}
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>

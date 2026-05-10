@@ -3,6 +3,8 @@ from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
+import re
+import asyncio
 import logging
 from pathlib import Path
 from pydantic import BaseModel, Field
@@ -145,6 +147,28 @@ class SpecialistLogin(BaseModel):
 
 
 # ----------------------- HELPERS -----------------------
+TIME_RE = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
+DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+ALLOWED_STATUS = {"Confirmada", "En curso", "Finalizada"}
+DAY_MINUTES = 24 * 60
+
+
+def _validate_time(value: str, field: str = "hora") -> str:
+    if not isinstance(value, str) or not TIME_RE.match(value):
+        raise HTTPException(400, f"Formato de {field} inválido (esperado HH:MM)")
+    return value
+
+
+def _validate_date(value: str) -> str:
+    if not isinstance(value, str) or not DATE_RE.match(value):
+        raise HTTPException(400, "Formato de fecha inválido (esperado YYYY-MM-DD)")
+    try:
+        datetime.strptime(value, "%Y-%m-%d")
+    except ValueError:
+        raise HTTPException(400, "Fecha inválida")
+    return value
+
+
 def time_to_minutes(t: str) -> int:
     h, m = t.split(":")
     return int(h) * 60 + int(m)
@@ -158,6 +182,23 @@ def minutes_to_time(mins: int) -> str:
 
 def overlaps(a_start: int, a_end: int, b_start: int, b_end: int) -> bool:
     return a_start < b_end and b_start < a_end
+
+
+# Per-(specialist_id, date) async locks to serialise the
+# read-then-write conflict check inside `create_appointment`. This prevents two
+# concurrent requests from both passing the conflict check and both inserting.
+_appt_locks: dict = {}
+_appt_locks_master = asyncio.Lock()
+
+
+async def _get_appt_lock(specialist_id: str, date: str) -> asyncio.Lock:
+    key = f"{specialist_id}|{date}"
+    async with _appt_locks_master:
+        lock = _appt_locks.get(key)
+        if lock is None:
+            lock = asyncio.Lock()
+            _appt_locks[key] = lock
+        return lock
 
 # ----------------------- AUTH -----------------------
 @api_router.post("/auth/verify-pin")
@@ -339,16 +380,31 @@ async def list_clients(q: Optional[str] = None):
 # ----------------------- APPOINTMENTS -----------------------
 @api_router.post("/appointments", response_model=Appointment)
 async def create_appointment(payload: AppointmentCreate):
+    # ---- Input validation ----
+    _validate_date(payload.date)
+    _validate_time(payload.start_time, "hora de inicio")
+    if not (payload.client_name or "").strip():
+        raise HTTPException(400, "Nombre del cliente requerido")
+
     # Validate specialist exists
     specialist = await db.specialists.find_one({"id": payload.specialist_id}, {"_id": 0})
     if not specialist:
         raise HTTPException(400, "Especialista no encontrado")
 
+    # Validate specialist's own schedule format (defensive)
+    _validate_time(specialist.get("start_time", ""), "turno especialista")
+    _validate_time(specialist.get("end_time", ""), "turno especialista")
+
     is_floating = bool(payload.is_floating)
     if is_floating:
         if not payload.custom_service_name or not payload.custom_duration_minutes:
             raise HTTPException(400, "Cita flotante requiere nombre del servicio y duración")
-        duration = int(payload.custom_duration_minutes)
+        try:
+            duration = int(payload.custom_duration_minutes)
+        except (TypeError, ValueError):
+            raise HTTPException(400, "Duración inválida")
+        if duration <= 0 or duration > DAY_MINUTES:
+            raise HTTPException(400, "Duración fuera de rango (1 — 1440 min)")
         service_id_value = ""
     else:
         if not payload.service_id:
@@ -356,11 +412,18 @@ async def create_appointment(payload: AppointmentCreate):
         service = await db.services.find_one({"id": payload.service_id}, {"_id": 0})
         if not service:
             raise HTTPException(400, "Servicio no encontrado")
-        duration = int(service["duration_minutes"])
+        try:
+            duration = int(service["duration_minutes"])
+        except (TypeError, ValueError, KeyError):
+            raise HTTPException(400, "Duración del servicio inválida")
+        if duration <= 0 or duration > DAY_MINUTES:
+            raise HTTPException(400, "Duración del servicio fuera de rango")
         service_id_value = payload.service_id
 
     start_min = time_to_minutes(payload.start_time)
     end_min = start_min + duration
+    if end_min > DAY_MINUTES:
+        raise HTTPException(400, "La cita se extiende más allá del día")
     end_time_str = minutes_to_time(end_min)
 
     # Validate within specialist's schedule
@@ -372,42 +435,50 @@ async def create_appointment(payload: AppointmentCreate):
             f"Horario fuera del turno del especialista ({specialist['start_time']} - {specialist['end_time']})"
         )
 
-    # Conflict check: same specialist + same date + overlapping time
-    # Skip conflict if the new appointment is marked as overbooked or floating
+    # Validate status
+    status_value = payload.status or "Confirmada"
+    if status_value not in ALLOWED_STATUS:
+        raise HTTPException(400, f"Estado inválido. Permitidos: {sorted(ALLOWED_STATUS)}")
+
+    # Conflict check + insert under a per-(specialist, date) lock to avoid
+    # the read-then-write race condition between concurrent requests.
     skip_conflict = bool(payload.is_overbooked) or is_floating
-    if not skip_conflict:
-        existing_appts = await db.appointments.find(
-            {"specialist_id": payload.specialist_id, "date": payload.date},
-            {"_id": 0}
-        ).to_list(500)
+    lock = await _get_appt_lock(payload.specialist_id, payload.date)
+    async with lock:
+        if not skip_conflict:
+            existing_appts = await db.appointments.find(
+                {"specialist_id": payload.specialist_id, "date": payload.date,
+                 "is_overbooked": {"$ne": True}, "is_floating": {"$ne": True}},
+                {"_id": 0}
+            ).to_list(500)
 
-        for a in existing_appts:
-            a_start = time_to_minutes(a["start_time"])
-            a_end = time_to_minutes(a["end_time"])
-            if overlaps(start_min, end_min, a_start, a_end):
-                raise HTTPException(
-                    409,
-                    f"Conflicto: el especialista ya tiene una cita de {a['start_time']} a {a['end_time']}"
-                )
+            for a in existing_appts:
+                a_start = time_to_minutes(a["start_time"])
+                a_end = time_to_minutes(a["end_time"])
+                if overlaps(start_min, end_min, a_start, a_end):
+                    raise HTTPException(
+                        409,
+                        f"Conflicto: el especialista ya tiene una cita de {a['start_time']} a {a['end_time']}"
+                    )
 
-    appt = Appointment(
-        specialist_id=payload.specialist_id,
-        service_id=service_id_value,
-        client_name=payload.client_name,
-        client_phone=payload.client_phone or "",
-        date=payload.date,
-        start_time=payload.start_time,
-        end_time=end_time_str,
-        status=payload.status or "Confirmada",
-        branch_id=specialist.get("branch_id"),
-        is_overbooked=bool(payload.is_overbooked) or is_floating,
-        is_floating=is_floating,
-        custom_service_name=payload.custom_service_name if is_floating else None,
-        custom_duration_minutes=duration if is_floating else None,
-    )
-    doc = appt.model_dump()
-    doc["created_at"] = doc["created_at"].isoformat()
-    await db.appointments.insert_one(doc)
+        appt = Appointment(
+            specialist_id=payload.specialist_id,
+            service_id=service_id_value,
+            client_name=payload.client_name.strip(),
+            client_phone=(payload.client_phone or "").strip(),
+            date=payload.date,
+            start_time=payload.start_time,
+            end_time=end_time_str,
+            status=status_value,
+            branch_id=specialist.get("branch_id"),
+            is_overbooked=bool(payload.is_overbooked) or is_floating,
+            is_floating=is_floating,
+            custom_service_name=payload.custom_service_name if is_floating else None,
+            custom_duration_minutes=duration if is_floating else None,
+        )
+        doc = appt.model_dump()
+        doc["created_at"] = doc["created_at"].isoformat()
+        await db.appointments.insert_one(doc)
 
     # Upsert client by phone (if provided) to build a directory
     phone = (payload.client_phone or "").strip()
@@ -418,10 +489,10 @@ async def create_appointment(payload: AppointmentCreate):
             if existing_client.get("name") != payload.client_name:
                 await db.clients.update_one(
                     {"id": existing_client["id"]},
-                    {"$set": {"name": payload.client_name}}
+                    {"$set": {"name": payload.client_name.strip()}}
                 )
         else:
-            client_obj = Client(name=payload.client_name, phone=phone)
+            client_obj = Client(name=payload.client_name.strip(), phone=phone)
             await db.clients.insert_one(client_obj.model_dump())
 
     return appt
@@ -431,8 +502,10 @@ async def create_appointment(payload: AppointmentCreate):
 async def list_appointments(date: Optional[str] = None, week_start: Optional[str] = None, branch_id: Optional[str] = None):
     q = {}
     if date:
+        _validate_date(date)
         q["date"] = date
     elif week_start:
+        _validate_date(week_start)
         # 7 day range
         start_d = datetime.strptime(week_start, "%Y-%m-%d")
         dates = [(start_d + timedelta(days=i)).strftime("%Y-%m-%d") for i in range(7)]
@@ -442,8 +515,17 @@ async def list_appointments(date: Optional[str] = None, week_start: Optional[str
     docs = await db.appointments.find(q, {"_id": 0}).to_list(1000)
     for d in docs:
         if isinstance(d.get("created_at"), str):
-            d["created_at"] = datetime.fromisoformat(d["created_at"])
-    docs.sort(key=lambda x: (x["date"], x["start_time"]))
+            try:
+                d["created_at"] = datetime.fromisoformat(d["created_at"])
+            except ValueError:
+                d["created_at"] = datetime.now(timezone.utc)
+    # Stable ordering: date, start_time, then created_at to keep extras/floating
+    # rendered in the order they were added when multiple share a slot.
+    docs.sort(key=lambda x: (
+        x.get("date", ""),
+        x.get("start_time", ""),
+        x.get("created_at") or datetime.min.replace(tzinfo=timezone.utc),
+    ))
     return docs
 
 
@@ -453,11 +535,16 @@ async def update_appointment(appt_id: str, payload: AppointmentUpdate):
     if not existing:
         raise HTTPException(404, "Cita no encontrada")
     update = {k: v for k, v in payload.model_dump().items() if v is not None}
+    if "status" in update and update["status"] not in ALLOWED_STATUS:
+        raise HTTPException(400, f"Estado inválido. Permitidos: {sorted(ALLOWED_STATUS)}")
     if update:
         await db.appointments.update_one({"id": appt_id}, {"$set": update})
         existing.update(update)
     if isinstance(existing.get("created_at"), str):
-        existing["created_at"] = datetime.fromisoformat(existing["created_at"])
+        try:
+            existing["created_at"] = datetime.fromisoformat(existing["created_at"])
+        except ValueError:
+            existing["created_at"] = datetime.now(timezone.utc)
     return existing
 
 
@@ -646,6 +733,20 @@ logger = logging.getLogger(__name__)
 
 @app.on_event("startup")
 async def on_startup():
+    try:
+        # Indexes for fast appointment lookups (idempotent)
+        await db.appointments.create_index([("specialist_id", 1), ("date", 1)])
+        await db.appointments.create_index([("branch_id", 1), ("date", 1)])
+        await db.appointments.create_index([("date", 1), ("start_time", 1)])
+        await db.appointments.create_index("id", unique=True)
+        await db.specialists.create_index("id", unique=True)
+        await db.specialists.create_index("access_code")
+        await db.services.create_index("id", unique=True)
+        await db.branches.create_index("id", unique=True)
+        await db.clients.create_index("phone")
+        logger.info("Indexes ensured")
+    except Exception as e:
+        logger.error(f"Index creation failed: {e}")
     try:
         await seed_data()
         logger.info("Seed completed")

@@ -1,71 +1,66 @@
-# Manuel & Torres — Sistema de Agenda
+# Manuel & Torres · App de Gestión
 
 ## Problema original
-Refactorizar la vista "Agenda del día" de la app web del repo `https://github.com/hm5559347-hash/AppPrueba`:
-- Cambiar la vista de lista por una **tabla tipo Excel**.
-- Columnas = especialistas dinámicos (BD), Filas = bloques de 60 min (08:00–20:00).
-- Celdas vacías muestran botón `+` que abre el modal de Nueva Cita con `specialist_id` y hora preseleccionados por props.
-- Encabezados sticky (fila de especialistas y columna de horas).
-- Date picker para cambiar día visualizado.
-- Estética actual conservada (Tailwind blanco/negro).
+"Mira esta app del siguiente link de github es mia: https://github.com/manuelytorresagenda-commits/ManuelYTorres. Todo está perfecto solo me gustaría que en todos los bloques para agendar y que están divididos por horas, sean mejor en medias horas."
+"quedo perfecto, ya solo podrias como mejorar toda la programación en cuanto a las citas para que no haya ningún problema si se agendan varias citas extras o flotantes en una misma hora, y hacer mas robusto toda la programación de por medio para que no vaya a fallar"
 
-## Arquitectura
-- Backend: FastAPI + MongoDB (Motor) — endpoints `/api/branches`, `/api/specialists`, `/api/services`, `/api/appointments`.
-- Frontend: React + TailwindCSS + shadcn/ui.
-- Auth: PIN (0000) + selección de sucursal.
+## Stack
+- Backend: FastAPI + MongoDB (motor async)
+- Frontend: React (CRA + craco) + Tailwind
+- Auth: PIN app (1234) + PIN sucursal (1111/2222/3333) + PIN maestro (0000) + login especialista por código
 
-## Requerimientos centrales
-- Cuadrícula tipo timetable (08–20, 13 filas × N especialistas).
-- Citas existentes renderizadas como card en la celda de inicio.
-- Citas largas (>60 min) ocupan varias filas vía `rowSpan`.
-- Filtro por especialista (reduce columnas).
-- Date picker + botón HOY.
-- Modal Nueva Cita reutilizable (con props `specialistId`, `startTime`, `date`).
-- Acciones rápidas en card: Iniciar / Finalizar / Eliminar.
-- Sticky: cabecera superior y primera columna.
-- Hora fuera de turno del especialista se muestra inactiva (sin botón +).
+---
 
-## Implementado (07-Mayo-2026)
-- `frontend/src/pages/DailyAgenda.jsx` reescrito como tabla `<table>` con `position: sticky` en `thead` y primer `<td>`.
-- `frontend/src/components/NewAppointmentModal.jsx` nuevo (usa Dialog de shadcn) con todos los prefills por props.
-- `rowSpan` calculado por duración de la cita (`Math.ceil(duration/60)`); celdas cubiertas se omiten.
-- Date picker (`agenda-date-input`) + botón HOY (`agenda-today-btn`).
-- Celdas fuera del turno del especialista: render inerte (`out-of-shift-{spId}-{h}`).
-- Pestaña "Nueva Cita" del menú lateral conserva la página tradicional `/nueva-cita`.
+## Iteración 1 (May 10, 2026): Bloques de 30 min
+- Sustituidos los bloques de 60 min por bloques de **30 min** en TODA la app (08:00–20:30, 26 filas) en `DailyAgenda.jsx`, `WeeklyAgenda.jsx`, `MyAgenda.jsx`.
+- Las celdas vacías abren modal "Nueva Cita" con `HORA INICIO` prefijada al slot exacto (incluye :30).
+- La duración de las citas no cambia.
 
-### Servicios Adicionales (Add-ons) [07-Mayo-2026]
-- Backend: modelo `Appointment.additional_services: List[AdditionalService(id, name)]` y `AppointmentUpdate.additional_services` aceptado por PATCH `/api/appointments/{id}`.
-- Frontend: `lib/api.js` → `updateAppointmentExtras(id, list)`.
-- `components/AppointmentDetailModal.jsx` nuevo: muestra detalle de cita (cliente/horario/especialista/servicio/estado) + sección "Servicios Adicionales" con input para añadir y botón de eliminar por extra.
-- En `DailyAgenda.jsx`: clic en card abre el detail modal; los extras se renderizan como lista de viñetas dentro del card de la cita (debajo del servicio principal). Los extras NO modifican `start_time/end_time` ni el `rowSpan` de la cita.
+## Iteración 2 (May 10, 2026): Hardening del scheduling
 
-### Citas Extemporáneas / Sobrecupo (Overbooking) [07-Mayo-2026]
-- Backend: `Appointment.is_overbooked: bool = False` + `AppointmentCreate.is_overbooked` opcional. La validación de conflicto de horario en `POST /api/appointments` se OMITE cuando `is_overbooked=true` (HTTP 409 sólo en citas regulares).
-- Frontend (modal Nueva Cita): toggle/checkbox `data-testid="overbooked-checkbox"`. Cuando se activa, los slots con conflicto dejan de marcarse como deshabilitados y el backend acepta el solapamiento.
-- Frontend (DailyAgenda grid): el mapa `startsAt` ahora soporta múltiples citas por hora de inicio (`Array<{appt, span}>`); las celdas pueden renderizar varios cards apilados verticalmente. `rowSpan` = max(span) entre citas que comparten hora de inicio.
-- Estilo distintivo para citas extra: borde `dashed`, fondo `bg-amber-50/100`, badge amarillo `EXTRA` junto al estado.
+### Bug crítico corregido
+Antes: si una cita primaria 10:00-10:45 abarcaba 2 filas (10:00 + 10:30), una cita **extra o flotante** que arrancara en 10:30 **no se renderizaba** porque la fila 10:30 estaba marcada como "cubierta" por la primaria.
+Ahora: helper `buildOverlapGrid` (en `frontend/src/lib/scheduling.js`) agrupa todas las citas que se solapan (incluyendo extras/flotantes que arrancan tarde) en un solo "cluster" anclado al slot más temprano. Todas las citas del cluster se renderizan apiladas dentro de la misma celda con `rowSpan` igual al rango del cluster. Probado con hasta 5 flotantes solapadas en el mismo slot — todas visibles.
 
-### Teléfono + Citas Flotantes + Vista Semanal mejorada [07-Mayo-2026]
-- Teléfono: `client_phone` se captura en el modal Nueva Cita, en la página `/nueva-cita` (justo debajo de Nombre) y en el modal de Cita Flotante. Se muestra en `AppointmentDetailModal` como `<a href="tel:...">` clickable.
-- Citas Flotantes: nuevo modelo `Appointment.is_floating`, `custom_service_name`, `custom_duration_minutes`. Backend salta validación de servicio del catálogo (servicio libre) y de conflicto cuando `is_floating=true`. Frontend: nuevo botón "Cita Flotante" en header de Agenda del Día (sky-blue) que abre `FloatingAppointmentModal.jsx` con campos: especialista, servicio (texto libre), cliente, teléfono, fecha, hora, duración (chips 15/30/45/60/90 + input numérico). Estilo visual distinto: borde sky-700 dashed, fondo `bg-sky-50/100`, badge sky-400 `FLOTANTE`.
-- Vista semanal (`WeeklyAgenda` y `MyAgenda` Semana): celdas ahora ocupan múltiples filas con `rowSpan` proporcional a la duración. Se muestra nombre del servicio (custom_service_name si is_floating), nombre del cliente y nombre del especialista. Badges `FLOT`/`EXTRA` en mini-cards.
+### Backend (`server.py`)
+1. Validación de formato `HH:MM` (regex) y `YYYY-MM-DD` con `datetime.strptime`.
+2. Validación de `client_name` no vacío.
+3. Validación de duración custom: 1 ≤ duración ≤ 1440 min.
+4. Validación de que `end_time` no se salga del día (24×60 min).
+5. Validación de `status` enum {Confirmada, En curso, Finalizada} en POST y PATCH.
+6. **Race condition** corregida: lock `asyncio.Lock` por `(specialist_id, date)` que serializa el read-then-write del conflict check + insert. Probado con 5 requests concurrentes solapadas → solo 1 acepta, 4 dan 409.
+7. Conflict check ahora **excluye** citas marcadas como overbooked/floating, así una cita regular puede crearse en huecos libres aunque haya extras encima.
+8. Indexes MongoDB en `(specialist_id, date)`, `(branch_id, date)`, `(date, start_time)` y unique en `id` (creados al startup, idempotentes).
+9. Orden estable en GET `/api/appointments`: ordena por `(date, start_time, created_at)` para que múltiples citas en el mismo slot devuelvan en orden de creación.
 
-### PIN por Sucursal [07-Mayo-2026]
-- Backend: `Branch.pin: Optional[str] = None` (se omite del listado público vía proyección Mongo `{pin: 0}`). Endpoints nuevos: `POST /api/branches/{id}/verify-pin` (200/401) y `PATCH /api/branches/{id}/pin` (valida 4 dígitos numéricos). Seed asigna Centro=`1111`, Norte=`2222`, Sur=`3333` con backfill idempotente.
-- Frontend: nuevo `components/PinPromptDialog.jsx` (teclado numérico reutilizable con shake en error). `BranchSelector` ahora abre el dialog al hacer clic en INGRESAR; sólo navega a `/agenda` y persiste la sucursal en contexto si el PIN es correcto. Catálogo > Sucursales: nuevo botón **PIN** por card que abre `ChangeBranchPinDialog.jsx` (2 fases: PIN maestro `0000` → nuevo PIN de la sucursal).
-- Eliminar sucursal: el botón de basura ahora abre `PinPromptDialog` pidiendo el PIN maestro (`0000`) antes de ejecutar `DELETE /api/branches/{id}`. Reemplaza al `window.confirm` previo.
+### Frontend
+1. **`/app/frontend/src/lib/scheduling.js` (nuevo)**: helper compartido `buildOverlapGrid` con orden estable (regular → overbooked → floating, luego created_at, luego start_time, luego id) y `SLOTS` array.
+2. **`DailyAgenda.jsx`**: usa `buildOverlapGrid`. Badge `×N` en esquina del cluster cuando hay 2+ citas. data-testid: `cell-count-{spId}-{HH:MM}`.
+3. **`WeeklyAgenda.jsx`**: igual. data-testid: `week-cell-count-{date}-{HH:MM}`.
+4. **`MyAgenda.jsx`** (vista semana): igual. data-testid: `my-week-cell-count-{date}-{HH:MM}`.
 
-### Servicios independientes por Sucursal [07-Mayo-2026]
-- Backend: `Service.branch_id: Optional[str]` añadido. `GET /api/services?branch_id=...` filtra por sucursal (incluye legacy services sin branch_id por compatibilidad). Migración idempotente en `seed_data`: si hay servicios legacy sin branch_id, los clona a cada sucursal y elimina los originales; cada sucursal nueva queda con `SAMPLE_SERVICES` propio.
-- Frontend: `lib/api.js fetchServices` acepta `params` (`{branch_id}`). Todos los callsites (`Catalog`, `DailyAgenda`, `WeeklyAgenda`, `MyAgenda`, `NewAppointment`, `NewAppointmentModal`) pasan el `branch_id` actual. Catálogo recarga al cambiar de sucursal y al crear servicio asigna `branch_id = branch.id`. Cada sucursal tiene su propio precio/duración: verificado cambiar Centro a $999 mantiene Norte en $350.
+### Validación
+- **Backend pytest 23/23 PASS** (`/app/backend/tests/test_appointment_hardening.py`):
+  - Validaciones de hora/fecha/duración/status/end_time
+  - Conflict de regulares → 409
+  - Regular se crea encima de extras existentes
+  - Race condition: 5 concurrentes → 1 wins
+  - Render scenario: primaria + extra ambas en GET
+  - Stable ordering por created_at
+- **Frontend manual screenshots**:
+  - 3 citas solapadas (primaria+extra+flotante) → cluster con badge ×3, todas visibles ✓
+  - 5 citas flotantes en el mismo slot 14:00 → cluster con badge ×5, todas visibles ✓
+  - Vista semanal idem ✓
 
-### Separación PIN de Inicio vs PIN Maestro [07-Mayo-2026]
-- Backend: `APP_PIN = "1111"` (PIN de inicio / pantalla de bienvenida) y `MASTER_PIN = "0000"` (acciones administrativas: editar/eliminar sucursales, cambiar PIN de sucursal). Nuevo endpoint `POST /api/auth/verify-master-pin` (200/401) además del existente `POST /api/auth/verify-pin`.
-- Frontend: `lib/api.js verifyMasterPin` añadido. `PinLock` sigue usando `verifyPin` (entry, 1111). `Catalog.handleDeleteVerify` y `ChangeBranchPinDialog` (paso 1) ahora usan `verifyMasterPin` (0000). Verificado E2E que el PIN de inicio NO autoriza acciones administrativas y viceversa.
+## Archivos modificados
+- /app/backend/server.py
+- /app/frontend/src/lib/scheduling.js (nuevo)
+- /app/frontend/src/pages/DailyAgenda.jsx
+- /app/frontend/src/pages/WeeklyAgenda.jsx
+- /app/frontend/src/pages/MyAgenda.jsx
+- /app/backend/tests/test_appointment_hardening.py (nuevo)
 
-## Backlog / Próximos
-- P1: Drag & drop de citas entre celdas.
-- P1: Doble-clic en card abrir modal de edición.
-- P2: Vista por bloques de 30 min (toggle).
-- P2: Indicador visual de "ahora" (línea horizontal sobre la hora actual).
-- P3: Multi-selección de especialistas en filtro.
+## Backlog / próximos pasos
+- (opcional) Layout en columnas dentro del cluster cuando hay 3+ citas (estilo Google Calendar)
+- (opcional) Botón "+ Extra" sobre el cluster para añadir directamente una cita encima
+- (opcional) Vista de día con zoom (15 min slots) para gestores con alta densidad

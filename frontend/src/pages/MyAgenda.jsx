@@ -4,8 +4,9 @@ import { useAuth } from "../context/AuthContext";
 import { fetchAppointments, fetchServices } from "../lib/api";
 import { LogOut, Clock, ChevronLeft, ChevronRight, CalendarDays, CalendarRange } from "lucide-react";
 import { toast } from "sonner";
+import { SLOTS, minToTime, buildOverlapGrid } from "../lib/scheduling";
 
-const HOURS = Array.from({ length: 13 }, (_, i) => 8 + i);
+// SLOTS / minToTime imported from ../lib/scheduling
 const DAYS_ES = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 
 function timeToMin(t) {
@@ -70,10 +71,11 @@ export default function MyAgenda() {
 
   const grouped = useMemo(() => {
     const map = {};
-    HOURS.forEach((h) => (map[h] = []));
+    SLOTS.forEach((s) => (map[s] = []));
     appointments.forEach((a) => {
-      const h = parseInt(a.start_time.split(":")[0]);
-      if (map[h]) map[h].push(a);
+      const startMin = timeToMin(a.start_time);
+      const slot = Math.floor(startMin / 30) * 30;
+      if (map[slot]) map[slot].push(a);
     });
     return map;
   }, [appointments]);
@@ -85,31 +87,12 @@ export default function MyAgenda() {
     [weekStart]
   );
 
-  // Per-day grid for week view: { [ds]: { startsAt: Map, coveredHours: Set } }
+  // Per-day overlap grid for week view
   const weekGrid = useMemo(() => {
     const result = {};
     days.forEach((d) => {
       const ds = d.toISOString().slice(0, 10);
-      result[ds] = { startsAt: new Map(), coveredHours: new Set() };
-    });
-    appointments.forEach((a) => {
-      if (!result[a.date]) return;
-      const startMin = timeToMin(a.start_time);
-      const endMin = timeToMin(a.end_time);
-      const startHour = Math.floor(startMin / 60);
-      const endHour = Math.ceil(endMin / 60);
-      const span = Math.max(1, endHour - startHour);
-      const list = result[a.date].startsAt.get(startHour) || [];
-      list.push({ appt: a, span });
-      result[a.date].startsAt.set(startHour, list);
-    });
-    Object.values(result).forEach((bucket) => {
-      bucket.startsAt.forEach((list, startHour) => {
-        const maxSpan = list.reduce((m, x) => Math.max(m, x.span), 1);
-        for (let h = startHour + 1; h < startHour + maxSpan; h++) {
-          bucket.coveredHours.add(h);
-        }
-      });
+      result[ds] = buildOverlapGrid(appointments.filter((a) => a.date === ds));
     });
     return result;
   }, [appointments, days]);
@@ -202,12 +185,14 @@ export default function MyAgenda() {
               <div className="font-mono-label text-[10px] text-neutral-500 mb-4">
                 {appointments.length} CITA{appointments.length !== 1 ? "S" : ""} HOY
               </div>
-              {HOURS.map((h) => {
-                const items = grouped[h] || [];
+              {SLOTS.map((slotMin) => {
+                const items = grouped[slotMin] || [];
+                const hh = Math.floor(slotMin / 60);
+                const mm = slotMin % 60;
                 return (
-                  <div key={h} className="grid grid-cols-[80px_1fr] gap-6 border-t border-neutral-200 py-4 first:border-t-0">
+                  <div key={slotMin} className="grid grid-cols-[80px_1fr] gap-6 border-t border-neutral-200 py-4 first:border-t-0">
                     <div className="font-serif-display text-3xl text-neutral-400 leading-none pt-1">
-                      {String(h).padStart(2, "0")}<span className="text-base align-top">:00</span>
+                      {String(hh).padStart(2, "0")}<span className="text-base align-top">:{String(mm).padStart(2, "0")}</span>
                     </div>
                     <div className="space-y-2">
                       {items.length === 0 ? (
@@ -271,31 +256,43 @@ export default function MyAgenda() {
                 </tr>
               </thead>
               <tbody>
-                {HOURS.map((h) => (
-                  <tr key={h}>
+                {SLOTS.map((slotMin) => {
+                  const timeLabel = minToTime(slotMin);
+                  return (
+                  <tr key={slotMin}>
                     <td className="border-b border-r border-neutral-200 p-2 align-top font-mono-label text-[9px] text-neutral-500">
-                      {String(h).padStart(2, "0")}:00
+                      {timeLabel}
                     </td>
                     {days.map((d, i) => {
                       const ds = d.toISOString().slice(0, 10);
                       const bucket = weekGrid[ds];
                       if (!bucket) {
                         return (
-                          <td key={i} className="border-b border-r border-neutral-200 last:border-r-0 p-1 align-top h-[60px]" />
+                          <td key={i} className="border-b border-r border-neutral-200 last:border-r-0 p-1 align-top h-[30px]" />
                         );
                       }
-                      if (bucket.coveredHours.has(h)) return null;
-                      const list = bucket.startsAt.get(h) || [];
-                      const maxSpan = list.reduce((m, x) => Math.max(m, x.span), 0);
+                      if (bucket.coveredSlots.has(slotMin)) return null;
+                      const cluster = bucket.startsAt.get(slotMin);
+                      const apptList = cluster ? cluster.appts : [];
+                      const maxSpan = cluster ? cluster.span : 0;
+                      const groupCount = apptList.length;
                       return (
                         <td
                           key={i}
                           rowSpan={maxSpan || 1}
-                          data-testid={`my-week-cell-${ds}-${h}`}
-                          className="border-b border-r border-neutral-200 last:border-r-0 p-1 align-top h-[60px]"
+                          data-testid={`my-week-cell-${ds}-${timeLabel}`}
+                          className="border-b border-r border-neutral-200 last:border-r-0 p-1 align-top h-[30px] relative"
                         >
+                          {groupCount > 1 && (
+                            <span
+                              data-testid={`my-week-cell-count-${ds}-${timeLabel}`}
+                              className="absolute top-0.5 right-0.5 z-10 font-mono-label text-[7px] bg-black text-white px-1 border border-black"
+                            >
+                              ×{groupCount}
+                            </span>
+                          )}
                           <div className="flex flex-col gap-1 h-full">
-                            {list.map(({ appt: a }) => {
+                            {apptList.map((a) => {
                               const sv = findService(a.service_id);
                               const cls = a.is_floating
                                 ? "bg-sky-50 border border-sky-700 border-dashed text-black"
@@ -342,7 +339,8 @@ export default function MyAgenda() {
                       );
                     })}
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
