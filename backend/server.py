@@ -23,7 +23,7 @@ db = client[os.environ['DB_NAME']]
 
 # PINs
 APP_PIN = "1234"      # PIN de inicio (pantalla de bienvenida)
-MASTER_PIN = "0000"   # PIN maestro (acciones administrativas: editar/eliminar sucursales, etc.)
+MASTER_PIN = "0000"   # PIN maestro (acciones administrativas)
 
 app = FastAPI()
 api_router = APIRouter(prefix="/api")
@@ -200,20 +200,18 @@ def overlaps(a_start: int, a_end: int, b_start: int, b_end: int) -> bool:
 
 
 def _normalize_handle(value: Optional[str]) -> str:
-    """Strip whitespace and a leading '@' from social handles."""
     v = (value or "").strip()
     if v.startswith("@"):
         v = v[1:].strip()
     return v
 
 
-# Accepted birthday formats: "" | "YYYY-MM-DD" | "MM-DD" | "DD/MM" | "DD/MM/YYYY"
 BIRTHDAY_RE = re.compile(
     r"^(?:|"
-    r"\d{4}-\d{2}-\d{2}|"      # YYYY-MM-DD
-    r"\d{2}-\d{2}|"             # MM-DD
-    r"\d{2}/\d{2}|"             # DD/MM
-    r"\d{2}/\d{2}/\d{4}"        # DD/MM/YYYY
+    r"\d{4}-\d{2}-\d{2}|"
+    r"\d{2}-\d{2}|"
+    r"\d{2}/\d{2}|"
+    r"\d{2}/\d{2}/\d{4}"
     r")$"
 )
 
@@ -228,12 +226,6 @@ def _normalize_birthday(value: Optional[str]) -> str:
 
 
 async def _upsert_client(name: str, phone: str, instagram: str, tiktok: str, birthday: str) -> None:
-    """Insert or update a client record so the autocomplete keeps growing.
-
-    Lookup priority: by phone if provided, otherwise by case-insensitive name.
-    Only overwrites stored social/birthday fields when the incoming value is
-    non-empty (so old data isn't wiped by a quick booking that skipped fields).
-    """
     if not name:
         return
     query = {"phone": phone} if phone else {
@@ -261,9 +253,6 @@ async def _upsert_client(name: str, phone: str, instagram: str, tiktok: str, bir
         await db.clients.insert_one(client_obj.model_dump())
 
 
-# Per-(specialist_id, date) async locks to serialise the
-# read-then-write conflict check inside `create_appointment`. This prevents two
-# concurrent requests from both passing the conflict check and both inserting.
 _appt_locks: dict = {}
 _appt_locks_master = asyncio.Lock()
 
@@ -280,7 +269,6 @@ async def _get_appt_lock(specialist_id: str, date: str) -> asyncio.Lock:
 # ----------------------- AUTH -----------------------
 @api_router.post("/auth/verify-pin")
 async def verify_pin(payload: PinVerify):
-    # PIN de inicio (entry PIN)
     print(f"--- Intento de login (entry) con PIN: {payload.pin} ---")
     if payload.pin == APP_PIN:
         return {"success": True}
@@ -289,7 +277,6 @@ async def verify_pin(payload: PinVerify):
 
 @api_router.post("/auth/verify-master-pin")
 async def verify_master_pin(payload: PinVerify):
-    # PIN maestro para acciones administrativas
     print(f"--- Verificación PIN maestro: {payload.pin} ---")
     if payload.pin == MASTER_PIN:
         return {"success": True}
@@ -317,7 +304,6 @@ async def create_branch(payload: BranchCreate):
 
 @api_router.get("/branches", response_model=List[Branch])
 async def list_branches():
-    # Exclude pin from public listing
     docs = await db.branches.find({}, {"_id": 0, "pin": 0}).to_list(500)
     return docs
 
@@ -357,7 +343,6 @@ async def update_branch(branch_id: str, payload: BranchCreate):
 
 @api_router.delete("/branches/{branch_id}")
 async def delete_branch(branch_id: str):
-    # Prevent delete if has specialists or appointments
     has_sp = await db.specialists.find_one({"branch_id": branch_id}, {"_id": 0})
     if has_sp:
         raise HTTPException(400, "La sucursal tiene especialistas asignados")
@@ -405,7 +390,7 @@ async def delete_specialist(specialist_id: str):
     return {"success": True}
 
 
-# ----------------------- SERVICES -----------------------
+# ----------------------- SERVICES (CATÁLOGO GLOBAL) -----------------------
 @api_router.post("/services", response_model=Service)
 async def create_service(payload: ServiceCreate):
     sv = Service(**payload.model_dump())
@@ -415,11 +400,8 @@ async def create_service(payload: ServiceCreate):
 
 @api_router.get("/services", response_model=List[Service])
 async def list_services(branch_id: Optional[str] = None):
-    q = {}
-    if branch_id:
-        # include legacy services without branch_id (None) so they don't disappear during migration
-        q = {"$or": [{"branch_id": branch_id}, {"branch_id": None}, {"branch_id": ""}]}
-    docs = await db.services.find(q, {"_id": 0}).to_list(500)
+    # Devuelve el catálogo completo de servicios para cualquier sucursal
+    docs = await db.services.find({}, {"_id": 0}).to_list(500)
     return docs
 
 
@@ -445,7 +427,6 @@ async def delete_service(service_id: str):
 async def list_clients(q: Optional[str] = None, limit: int = 20):
     query = {}
     if q:
-        # Escape regex meta chars from the user input
         safe = re.escape(q.strip())
         if safe:
             query = {"$or": [
@@ -455,7 +436,6 @@ async def list_clients(q: Optional[str] = None, limit: int = 20):
                 {"tiktok": {"$regex": safe, "$options": "i"}},
             ]}
     docs = await db.clients.find(query, {"_id": 0}).to_list(500)
-    # Prefer prefix matches on the name, then alpha.
     q_norm = (q or "").strip().lower()
     def _rank(c):
         name = (c.get("name") or "").lower()
@@ -471,18 +451,15 @@ async def list_clients(q: Optional[str] = None, limit: int = 20):
 # ----------------------- APPOINTMENTS -----------------------
 @api_router.post("/appointments", response_model=Appointment)
 async def create_appointment(payload: AppointmentCreate):
-    # ---- Input validation ----
     _validate_date(payload.date)
     _validate_time(payload.start_time, "hora de inicio")
     if not (payload.client_name or "").strip():
         raise HTTPException(400, "Nombre del cliente requerido")
 
-    # Validate specialist exists
     specialist = await db.specialists.find_one({"id": payload.specialist_id}, {"_id": 0})
     if not specialist:
         raise HTTPException(400, "Especialista no encontrado")
 
-    # Validate specialist's own schedule format (defensive)
     _validate_time(specialist.get("start_time", ""), "turno especialista")
     _validate_time(specialist.get("end_time", ""), "turno especialista")
 
@@ -517,7 +494,6 @@ async def create_appointment(payload: AppointmentCreate):
         raise HTTPException(400, "La cita se extiende más allá del día")
     end_time_str = minutes_to_time(end_min)
 
-    # Validate within specialist's schedule
     sp_start = time_to_minutes(specialist["start_time"])
     sp_end = time_to_minutes(specialist["end_time"])
     if start_min < sp_start or end_min > sp_end:
@@ -526,13 +502,10 @@ async def create_appointment(payload: AppointmentCreate):
             f"Horario fuera del turno del especialista ({specialist['start_time']} - {specialist['end_time']})"
         )
 
-    # Validate status
     status_value = payload.status or "Confirmada"
     if status_value not in ALLOWED_STATUS:
         raise HTTPException(400, f"Estado inválido. Permitidos: {sorted(ALLOWED_STATUS)}")
 
-    # Conflict check + insert under a per-(specialist, date) lock to avoid
-    # the read-then-write race condition between concurrent requests.
     skip_conflict = bool(payload.is_overbooked) or is_floating
     lock = await _get_appt_lock(payload.specialist_id, payload.date)
     async with lock:
@@ -574,8 +547,6 @@ async def create_appointment(payload: AppointmentCreate):
         doc["created_at"] = doc["created_at"].isoformat()
         await db.appointments.insert_one(doc)
 
-    # Upsert client directory. Match by phone first; fall back to case-insensitive
-    # name when no phone is provided so the autocomplete still finds them.
     await _upsert_client(
         name=payload.client_name.strip(),
         phone=(payload.client_phone or "").strip(),
@@ -595,7 +566,6 @@ async def list_appointments(date: Optional[str] = None, week_start: Optional[str
         q["date"] = date
     elif week_start:
         _validate_date(week_start)
-        # 7 day range
         start_d = datetime.strptime(week_start, "%Y-%m-%d")
         dates = [(start_d + timedelta(days=i)).strftime("%Y-%m-%d") for i in range(7)]
         q["date"] = {"$in": dates}
@@ -608,8 +578,6 @@ async def list_appointments(date: Optional[str] = None, week_start: Optional[str
                 d["created_at"] = datetime.fromisoformat(d["created_at"])
             except ValueError:
                 d["created_at"] = datetime.now(timezone.utc)
-    # Stable ordering: date, start_time, then created_at to keep extras/floating
-    # rendered in the order they were added when multiple share a slot.
     docs.sort(key=lambda x: (
         x.get("date", ""),
         x.get("start_time", ""),
@@ -647,17 +615,6 @@ async def delete_appointment(appt_id: str):
 
 @api_router.post("/appointments/{appt_id}/reschedule", response_model=Appointment)
 async def reschedule_appointment(appt_id: str, payload: AppointmentReschedule):
-    """Move an existing appointment to a new (specialist, date, start_time).
-
-    Rules:
-      - Duration is preserved from the original appointment.
-      - New date/time must fit inside the new specialist's shift.
-      - Conflict check ignores overbooked/floating appointments AND the
-        appointment being rescheduled itself. Floating slots can therefore be
-        overlapped freely.
-      - Rescheduling a FLOATING appointment skips the conflict check entirely
-        (matches the create_appointment semantics).
-    """
     existing = await db.appointments.find_one({"id": appt_id}, {"_id": 0})
     if not existing:
         raise HTTPException(404, "Cita no encontrada")
@@ -665,7 +622,6 @@ async def reschedule_appointment(appt_id: str, payload: AppointmentReschedule):
     _validate_date(payload.date)
     _validate_time(payload.start_time, "hora de inicio")
 
-    # Resolve new specialist (either from payload or keep existing).
     new_specialist_id = payload.specialist_id or existing["specialist_id"]
     specialist = await db.specialists.find_one({"id": new_specialist_id}, {"_id": 0})
     if not specialist:
@@ -674,7 +630,6 @@ async def reschedule_appointment(appt_id: str, payload: AppointmentReschedule):
     _validate_time(specialist.get("start_time", ""), "turno especialista")
     _validate_time(specialist.get("end_time", ""), "turno especialista")
 
-    # Preserve duration from the existing appointment.
     old_start = time_to_minutes(existing["start_time"])
     old_end = time_to_minutes(existing["end_time"])
     duration = max(1, old_end - old_start)
@@ -687,7 +642,7 @@ async def reschedule_appointment(appt_id: str, payload: AppointmentReschedule):
     new_start = time_to_minutes(payload.start_time)
     new_end = new_start + duration
     if new_end > DAY_MINUTES:
-        raise HTTPException(400, "La cita se extiende m\u00e1s all\u00e1 del d\u00eda")
+        raise HTTPException(400, "La cita se extiende más allá del día")
     new_end_time = minutes_to_time(new_end)
 
     sp_start = time_to_minutes(specialist["start_time"])
@@ -706,7 +661,7 @@ async def reschedule_appointment(appt_id: str, payload: AppointmentReschedule):
                 {
                     "specialist_id": new_specialist_id,
                     "date": payload.date,
-                    "id": {"$ne": appt_id},                       # ignore self
+                    "id": {"$ne": appt_id},
                     "is_overbooked": {"$ne": True},
                     "is_floating": {"$ne": True},
                 },
@@ -781,11 +736,7 @@ async def seed_data():
             br = Branch(**b)
             await db.branches.insert_one(br.model_dump())
     else:
-        # Backfill pin on existing branches. First try exact-name match, then
-        # fall back to matching by keyword (Centro / Norte / Sur) so renaming
-        # the branch label in the UI doesn't leave it without a PIN.
         for b in SAMPLE_BRANCHES:
-            # Extract keyword from canonical name (last word after "·" or last token)
             canonical = b["name"]
             keyword = canonical.split("\u00b7")[-1].strip() if "\u00b7" in canonical else canonical.split()[-1]
             keyword_safe = re.escape(keyword)
@@ -809,8 +760,6 @@ async def seed_data():
                 },
                 {"$set": {"pin": b["pin"]}},
             )
-            # Extra safety: for the "Centro" branch always keep PIN=1111 even
-            # if the branch was renamed and previously had another pin.
             if keyword.lower() == "centro":
                 await db.branches.update_many(
                     {"name": {"$regex": keyword_safe, "$options": "i"}},
@@ -827,7 +776,6 @@ async def seed_data():
             sp = Specialist(branch_id=branch_id, **s)
             await db.specialists.insert_one(sp.model_dump())
     else:
-        # Backfill access_code and branch_id for existing seeded specialists by name
         for s in SAMPLE_SPECIALISTS:
             idx = s.get("branch_index", 0)
             branch_id = branches[idx % len(branches)]["id"] if branches else None
@@ -840,36 +788,18 @@ async def seed_data():
                     update_fields["branch_id"] = branch_id
                 if update_fields:
                     await db.specialists.update_one({"name": s["name"]}, {"$set": update_fields})
-        # Also backfill any specialist missing branch_id to first branch
         if branches:
             await db.specialists.update_many(
                 {"$or": [{"branch_id": None}, {"branch_id": {"$exists": False}}]},
                 {"$set": {"branch_id": branches[0]["id"]}}
             )
 
-    # Services (per-branch)
-    if branches:
-        # 1) Migrate legacy services without branch_id: replicate to each branch then delete originals
-        legacy = await db.services.find(
-            {"$or": [{"branch_id": None}, {"branch_id": ""}, {"branch_id": {"$exists": False}}]},
-            {"_id": 0},
-        ).to_list(1000)
-        if legacy:
-            for sv in legacy:
-                for br in branches:
-                    clone = {**sv, "id": str(uuid.uuid4()), "branch_id": br["id"]}
-                    await db.services.insert_one(clone)
-            await db.services.delete_many(
-                {"$or": [{"branch_id": None}, {"branch_id": ""}, {"branch_id": {"$exists": False}}]}
-            )
-
-        # 2) Ensure each branch has at least the SAMPLE_SERVICES catalog
-        for br in branches:
-            br_count = await db.services.count_documents({"branch_id": br["id"]})
-            if br_count == 0:
-                for s in SAMPLE_SERVICES:
-                    sv = Service(branch_id=br["id"], **s)
-                    await db.services.insert_one(sv.model_dump())
+    # Services (Global initial seed if empty)
+    sv_count = await db.services.count_documents({})
+    if sv_count == 0:
+        for s in SAMPLE_SERVICES:
+            sv = Service(**s)
+            await db.services.insert_one(sv.model_dump())
 
     # Backfill branch_id on appointments based on their specialist
     appts_without_branch = await db.appointments.find(
@@ -948,7 +878,6 @@ logger = logging.getLogger(__name__)
 @app.on_event("startup")
 async def on_startup():
     try:
-        # Indexes for fast appointment lookups (idempotent)
         await db.appointments.create_index([("specialist_id", 1), ("date", 1)])
         await db.appointments.create_index([("branch_id", 1), ("date", 1)])
         await db.appointments.create_index([("date", 1), ("start_time", 1)])
