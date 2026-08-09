@@ -95,7 +95,8 @@ export default function MyAgenda() {
   if (!specialist) return null;
 
   return (
-    <div className="min-h-screen bg-white" data-testid="my-agenda-page">
+    // Agregamos overflow-x-hidden y max-w-full para bloquear que toda la app se deslice
+    <div className="min-h-screen bg-white max-w-full overflow-x-hidden" data-testid="my-agenda-page">
       {/* Top bar */}
       <header className="border-b border-black px-6 lg:px-12 py-6 flex items-center justify-between gap-6 flex-wrap">
         <div className="flex items-center gap-4">
@@ -251,10 +252,10 @@ export default function MyAgenda() {
           )
         ) : (
           <div className="overflow-x-auto border border-black relative">
-            <table className="w-full border-collapse text-xs table-fixed min-w-[700px]" data-testid="my-week-grid">
+            {/* Cambiamos border-collapse por border-separate para arreglar el bug de la celda transparente */}
+            <table className="w-full border-separate border-spacing-0 text-xs table-fixed min-w-[700px]" data-testid="my-week-grid">
               <thead>
                 <tr>
-                  {/* Encabezado fijo con z-50 para estar por encima de TODO */}
                   <th className="sticky left-0 z-50 bg-white border-b border-r-2 border-black p-2 w-16 font-mono-label text-[9px] text-neutral-500 shadow-[4px_0_8px_rgba(0,0,0,0.08)]">
                     HORA
                   </th>
@@ -274,7 +275,6 @@ export default function MyAgenda() {
                   const timeLabel = minToTime(slotMin);
                   return (
                   <tr key={slotMin}>
-                    {/* Columna de hora fija con z-40 */}
                     <td className="sticky left-0 z-40 bg-white border-b border-r-2 border-black p-2 align-top font-mono-label text-[9px] text-neutral-500 shadow-[4px_0_8px_rgba(0,0,0,0.08)]">
                       {timeLabel}
                     </td>
@@ -283,7 +283,6 @@ export default function MyAgenda() {
                       const bucket = weekGrid[ds];
                       if (!bucket) {
                         return (
-                          // Celda vacía con z-0 explícito
                           <td key={i} className="border-b border-r border-neutral-200 last:border-r-0 p-1 align-top h-[30px] relative z-0" />
                         );
                       }
@@ -293,7 +292,6 @@ export default function MyAgenda() {
                       const maxSpan = cluster ? cluster.span : 0;
                       const groupCount = apptList.length;
                       return (
-                        // Celda de cita con z-0 explícito
                         <td
                           key={i}
                           rowSpan={maxSpan || 1}
