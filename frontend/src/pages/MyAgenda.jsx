@@ -254,13 +254,14 @@ export default function MyAgenda() {
             <table className="w-full border-collapse text-xs table-fixed min-w-[700px]" data-testid="my-week-grid">
               <thead>
                 <tr>
-                  <th className="sticky left-0 z-40 bg-white border-b border-r border-black p-2 w-16 font-mono-label text-[9px] text-neutral-500">
+                  {/* Encabezado fijo con z-50 para estar por encima de TODO */}
+                  <th className="sticky left-0 z-50 bg-white border-b border-r-2 border-black p-2 w-16 font-mono-label text-[9px] text-neutral-500 shadow-[4px_0_8px_rgba(0,0,0,0.08)]">
                     HORA
                   </th>
                   {days.map((d, i) => {
                     const isToday = d.toDateString() === new Date().toDateString();
                     return (
-                      <th key={i} className={`border-b border-r border-neutral-300 last:border-r-0 p-3 text-left min-w-[100px] ${isToday ? "bg-black text-white" : "bg-white"}`}>
+                      <th key={i} className={`border-b border-r border-neutral-300 last:border-r-0 p-3 text-left min-w-[100px] relative z-0 ${isToday ? "bg-black text-white" : "bg-white"}`}>
                         <div className="font-mono-label text-[9px] opacity-70">{DAYS_ES[i]}</div>
                         <div className="font-serif-display text-2xl leading-none mt-1">{d.getDate()}</div>
                       </th>
@@ -273,7 +274,8 @@ export default function MyAgenda() {
                   const timeLabel = minToTime(slotMin);
                   return (
                   <tr key={slotMin}>
-                    <td className="sticky left-0 z-30 bg-white border-b border-r border-black p-2 align-top font-mono-label text-[9px] text-neutral-500">
+                    {/* Columna de hora fija con z-40 */}
+                    <td className="sticky left-0 z-40 bg-white border-b border-r-2 border-black p-2 align-top font-mono-label text-[9px] text-neutral-500 shadow-[4px_0_8px_rgba(0,0,0,0.08)]">
                       {timeLabel}
                     </td>
                     {days.map((d, i) => {
@@ -281,7 +283,8 @@ export default function MyAgenda() {
                       const bucket = weekGrid[ds];
                       if (!bucket) {
                         return (
-                          <td key={i} className="border-b border-r border-neutral-200 last:border-r-0 p-1 align-top h-[30px]" />
+                          // Celda vacía con z-0 explícito
+                          <td key={i} className="border-b border-r border-neutral-200 last:border-r-0 p-1 align-top h-[30px] relative z-0" />
                         );
                       }
                       if (bucket.coveredSlots.has(slotMin)) return null;
@@ -290,11 +293,12 @@ export default function MyAgenda() {
                       const maxSpan = cluster ? cluster.span : 0;
                       const groupCount = apptList.length;
                       return (
+                        // Celda de cita con z-0 explícito
                         <td
                           key={i}
                           rowSpan={maxSpan || 1}
                           data-testid={`my-week-cell-${ds}-${timeLabel}`}
-                          className="border-b border-r border-neutral-200 last:border-r-0 p-1 align-top h-[30px] relative"
+                          className="border-b border-r border-neutral-200 last:border-r-0 p-1 align-top h-[30px] relative z-0"
                         >
                           {groupCount > 1 && (
                             <span
@@ -304,7 +308,7 @@ export default function MyAgenda() {
                               ×{groupCount}
                             </span>
                           )}
-                          <div className="flex flex-col gap-1 h-full">
+                          <div className="flex flex-col gap-1 h-full relative z-0">
                             {apptList.map((a) => {
                               const sv = findService(a.service_id);
                               const cls = a.is_floating
@@ -323,7 +327,7 @@ export default function MyAgenda() {
                                 <div
                                   key={a.id}
                                   data-testid={`my-week-appt-${a.id}`}
-                                  className={`${cls} p-2 text-[10px] leading-tight flex-1 flex flex-col gap-0.5 min-h-0 overflow-hidden`}
+                                  className={`${cls} p-2 text-[10px] leading-tight flex-1 flex flex-col gap-0.5 min-h-0 overflow-hidden relative z-0`}
                                 >
                                   <div className="flex items-center justify-between gap-1">
                                     <span className="font-mono-label text-[8px] opacity-70 truncate">
