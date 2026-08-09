@@ -95,72 +95,69 @@ export default function MyAgenda() {
   if (!specialist) return null;
 
   return (
+    // Agregamos overflow-x-hidden y max-w-full para bloquear que toda la app se deslice
     <div className="min-h-screen bg-white max-w-full overflow-x-hidden" data-testid="my-agenda-page">
-      
-      {/* Contenedor Sticky Superior que agrupa Header y Pestañas */}
-      <div className="sticky top-0 z-[60] bg-white flex flex-col">
-        {/* Top bar */}
-        <header className="border-b border-black px-6 lg:px-12 py-6 flex items-center justify-between gap-6 flex-wrap">
-          <div className="flex items-center gap-4">
-            {specialist.avatar_url ? (
-              <img src={specialist.avatar_url} alt="" className="w-14 h-14 object-cover grayscale border border-black" />
-            ) : (
-              <div className="w-14 h-14 bg-neutral-200 flex items-center justify-center font-serif-display text-2xl">
-                {specialist.name.split(" ").map(n => n[0]).slice(0, 2).join("")}
-              </div>
-            )}
-            <div>
-              <div className="font-mono-label text-[10px] text-neutral-500">ESPECIALISTA</div>
-              <div className="font-serif-display text-3xl leading-none mt-1" data-testid="my-name">{specialist.name}</div>
-              <div className="text-xs text-neutral-600 mt-1">{specialist.specialty} · {specialist.start_time}—{specialist.end_time}</div>
-            </div>
-          </div>
-          <button
-            onClick={handleLogout}
-            data-testid="my-logout-btn"
-            className="btn-invert border border-black px-4 py-3 font-mono-label text-[10px] hover:bg-black hover:text-white flex items-center gap-2"
-          >
-            <LogOut className="w-3 h-3" strokeWidth={1.5} /> Salir
-          </button>
-        </header>
-
-        {/* View toggle */}
-        <div className="border-b border-black flex bg-white">
-          <button
-            data-testid="my-view-day"
-            onClick={() => setView("day")}
-            className={`btn-invert px-6 py-4 font-mono-label text-[10px] border-r border-neutral-200 flex items-center gap-2 ${
-              view === "day" ? "bg-black text-white" : "hover:bg-neutral-100"
-            }`}
-          >
-            <CalendarDays className="w-3 h-3" strokeWidth={1.5} /> Hoy
-          </button>
-          <button
-            data-testid="my-view-week"
-            onClick={() => setView("week")}
-            className={`btn-invert px-6 py-4 font-mono-label text-[10px] border-r border-neutral-200 flex items-center gap-2 ${
-              view === "week" ? "bg-black text-white" : "hover:bg-neutral-100"
-            }`}
-          >
-            <CalendarRange className="w-3 h-3" strokeWidth={1.5} /> Semana
-          </button>
-          <div className="flex-1" />
-          {view === "week" && (
-            <div className="flex items-center gap-1 px-3">
-              <button onClick={() => { const d = new Date(weekStart); d.setDate(d.getDate() - 7); setWeekStart(d); }}
-                data-testid="my-week-prev"
-                className="btn-invert border border-black h-9 w-9 flex items-center justify-center hover:bg-black hover:text-white">
-                <ChevronLeft className="w-3 h-3" />
-              </button>
-              <span className="font-mono-label text-[10px] px-3" data-testid="my-week-range">{fmtRange()}</span>
-              <button onClick={() => { const d = new Date(weekStart); d.setDate(d.getDate() + 7); setWeekStart(d); }}
-                data-testid="my-week-next"
-                className="btn-invert border border-black h-9 w-9 flex items-center justify-center hover:bg-black hover:text-white">
-                <ChevronRight className="w-3 h-3" />
-              </button>
+      {/* Top bar */}
+      <header className="border-b border-black px-6 lg:px-12 py-6 flex items-center justify-between gap-6 flex-wrap">
+        <div className="flex items-center gap-4">
+          {specialist.avatar_url ? (
+            <img src={specialist.avatar_url} alt="" className="w-14 h-14 object-cover grayscale border border-black" />
+          ) : (
+            <div className="w-14 h-14 bg-neutral-200 flex items-center justify-center font-serif-display text-2xl">
+              {specialist.name.split(" ").map(n => n[0]).slice(0, 2).join("")}
             </div>
           )}
+          <div>
+            <div className="font-mono-label text-[10px] text-neutral-500">ESPECIALISTA</div>
+            <div className="font-serif-display text-3xl leading-none mt-1" data-testid="my-name">{specialist.name}</div>
+            <div className="text-xs text-neutral-600 mt-1">{specialist.specialty} · {specialist.start_time}—{specialist.end_time}</div>
+          </div>
         </div>
+        <button
+          onClick={handleLogout}
+          data-testid="my-logout-btn"
+          className="btn-invert border border-black px-4 py-3 font-mono-label text-[10px] hover:bg-black hover:text-white flex items-center gap-2"
+        >
+          <LogOut className="w-3 h-3" strokeWidth={1.5} /> Salir
+        </button>
+      </header>
+
+      {/* View toggle */}
+      <div className="border-b border-black flex">
+        <button
+          data-testid="my-view-day"
+          onClick={() => setView("day")}
+          className={`btn-invert px-6 py-4 font-mono-label text-[10px] border-r border-neutral-200 flex items-center gap-2 ${
+            view === "day" ? "bg-black text-white" : "hover:bg-neutral-100"
+          }`}
+        >
+          <CalendarDays className="w-3 h-3" strokeWidth={1.5} /> Hoy
+        </button>
+        <button
+          data-testid="my-view-week"
+          onClick={() => setView("week")}
+          className={`btn-invert px-6 py-4 font-mono-label text-[10px] border-r border-neutral-200 flex items-center gap-2 ${
+            view === "week" ? "bg-black text-white" : "hover:bg-neutral-100"
+          }`}
+        >
+          <CalendarRange className="w-3 h-3" strokeWidth={1.5} /> Semana
+        </button>
+        <div className="flex-1" />
+        {view === "week" && (
+          <div className="flex items-center gap-1 px-3">
+            <button onClick={() => { const d = new Date(weekStart); d.setDate(d.getDate() - 7); setWeekStart(d); }}
+              data-testid="my-week-prev"
+              className="btn-invert border border-black h-9 w-9 flex items-center justify-center hover:bg-black hover:text-white">
+              <ChevronLeft className="w-3 h-3" />
+            </button>
+            <span className="font-mono-label text-[10px] px-3" data-testid="my-week-range">{fmtRange()}</span>
+            <button onClick={() => { const d = new Date(weekStart); d.setDate(d.getDate() + 7); setWeekStart(d); }}
+              data-testid="my-week-next"
+              className="btn-invert border border-black h-9 w-9 flex items-center justify-center hover:bg-black hover:text-white">
+              <ChevronRight className="w-3 h-3" />
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Content */}
@@ -255,6 +252,7 @@ export default function MyAgenda() {
           )
         ) : (
           <div className="overflow-x-auto border border-black relative">
+            {/* Cambiamos border-collapse por border-separate para arreglar el bug de la celda transparente */}
             <table className="w-full border-separate border-spacing-0 text-xs table-fixed min-w-[700px]" data-testid="my-week-grid">
               <thead>
                 <tr>
