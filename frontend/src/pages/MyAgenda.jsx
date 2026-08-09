@@ -250,17 +250,17 @@ export default function MyAgenda() {
             </div>
           )
         ) : (
-          <div className="overflow-x-auto border border-black">
-            <table className="w-full border-collapse text-xs" data-testid="my-week-grid">
+          <div className="overflow-x-auto border border-black relative">
+            <table className="w-full border-collapse text-xs table-fixed min-w-[700px]" data-testid="my-week-grid">
               <thead>
                 <tr>
-                  <th className="sticky left-0 z-30 bg-white border-b border-r-2 border-black p-2 w-16 font-mono-label text-[9px] text-neutral-500 shadow-[2px_0_5px_rgba(0,0,0,0.08)]">
+                  <th className="sticky left-0 z-40 bg-white border-b border-r border-black p-2 w-16 font-mono-label text-[9px] text-neutral-500">
                     HORA
                   </th>
                   {days.map((d, i) => {
                     const isToday = d.toDateString() === new Date().toDateString();
                     return (
-                      <th key={i} className={`border-b border-r border-neutral-300 last:border-r-0 p-3 text-left ${isToday ? "bg-black text-white" : ""}`}>
+                      <th key={i} className={`border-b border-r border-neutral-300 last:border-r-0 p-3 text-left min-w-[100px] ${isToday ? "bg-black text-white" : "bg-white"}`}>
                         <div className="font-mono-label text-[9px] opacity-70">{DAYS_ES[i]}</div>
                         <div className="font-serif-display text-2xl leading-none mt-1">{d.getDate()}</div>
                       </th>
@@ -273,7 +273,7 @@ export default function MyAgenda() {
                   const timeLabel = minToTime(slotMin);
                   return (
                   <tr key={slotMin}>
-                    <td className="sticky left-0 z-20 bg-white border-b border-r-2 border-black p-2 align-top font-mono-label text-[9px] text-neutral-500 shadow-[2px_0_5px_rgba(0,0,0,0.08)]">
+                    <td className="sticky left-0 z-30 bg-white border-b border-r border-black p-2 align-top font-mono-label text-[9px] text-neutral-500">
                       {timeLabel}
                     </td>
                     {days.map((d, i) => {
@@ -323,19 +323,19 @@ export default function MyAgenda() {
                                 <div
                                   key={a.id}
                                   data-testid={`my-week-appt-${a.id}`}
-                                  className={`${cls} p-2 text-[10px] leading-tight flex-1 flex flex-col gap-0.5 min-h-0`}
+                                  className={`${cls} p-2 text-[10px] leading-tight flex-1 flex flex-col gap-0.5 min-h-0 overflow-hidden`}
                                 >
                                   <div className="flex items-center justify-between gap-1">
-                                    <span className="font-mono-label text-[8px] opacity-70">
+                                    <span className="font-mono-label text-[8px] opacity-70 truncate">
                                       {a.start_time}—{a.end_time}
                                     </span>
                                     {a.is_floating && (
-                                      <span className="font-mono-label text-[7px] bg-sky-400 text-black px-1 border border-black">
+                                      <span className="font-mono-label text-[7px] bg-sky-400 text-black px-1 border border-black shrink-0">
                                         FLOT
                                       </span>
                                     )}
                                     {a.is_overbooked && !a.is_floating && (
-                                      <span className="font-mono-label text-[7px] bg-amber-400 text-black px-1 border border-black">
+                                      <span className="font-mono-label text-[7px] bg-amber-400 text-black px-1 border border-black shrink-0">
                                         EXTRA
                                       </span>
                                     )}
