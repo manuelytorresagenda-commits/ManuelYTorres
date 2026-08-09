@@ -95,7 +95,6 @@ export default function MyAgenda() {
   if (!specialist) return null;
 
   return (
-    // Agregamos overflow-x-hidden y max-w-full para bloquear que toda la app se deslice
     <div className="min-h-screen bg-white max-w-full overflow-x-hidden" data-testid="my-agenda-page">
       {/* Top bar */}
       <header className="border-b border-black px-6 lg:px-12 py-6 flex items-center justify-between gap-6 flex-wrap">
@@ -231,10 +230,10 @@ export default function MyAgenda() {
                                       </span>
                                     )}
                                   </div>
-                                  <div className="font-serif-display text-2xl lg:text-3xl leading-tight truncate">
+                                  <div className="font-serif-display text-2xl lg:text-3xl leading-tight">
                                     {a.client_name}
                                   </div>
-                                  <div className="text-sm mt-1 opacity-80 truncate">{serviceLabel}</div>
+                                  <div className="text-sm mt-1 opacity-80">{serviceLabel}</div>
                                 </div>
                               );
                             })}
@@ -252,11 +251,11 @@ export default function MyAgenda() {
           )
         ) : (
           <div className="overflow-x-auto border border-black relative">
-            {/* Cambiamos border-collapse por border-separate para arreglar el bug de la celda transparente */}
             <table className="w-full border-separate border-spacing-0 text-xs table-fixed min-w-[700px]" data-testid="my-week-grid">
               <thead>
                 <tr>
-                  <th className="sticky left-0 z-50 bg-white border-b border-r-2 border-black p-2 w-16 font-mono-label text-[9px] text-neutral-500 shadow-[4px_0_8px_rgba(0,0,0,0.08)]">
+                  {/* Cambio: borde gris suave (border-neutral-200) en lugar de black */}
+                  <th className="sticky left-0 z-50 bg-white border-b border-r border-neutral-200 p-2 w-16 font-mono-label text-[9px] text-neutral-500 shadow-[4px_0_8px_rgba(0,0,0,0.08)]">
                     HORA
                   </th>
                   {days.map((d, i) => {
@@ -275,7 +274,8 @@ export default function MyAgenda() {
                   const timeLabel = minToTime(slotMin);
                   return (
                   <tr key={slotMin}>
-                    <td className="sticky left-0 z-40 bg-white border-b border-r-2 border-black p-2 align-top font-mono-label text-[9px] text-neutral-500 shadow-[4px_0_8px_rgba(0,0,0,0.08)]">
+                    {/* Cambio: borde gris suave (border-neutral-200) */}
+                    <td className="sticky left-0 z-40 bg-white border-b border-r border-neutral-200 p-2 align-top font-mono-label text-[9px] text-neutral-500 shadow-[4px_0_8px_rgba(0,0,0,0.08)]">
                       {timeLabel}
                     </td>
                     {days.map((d, i) => {
@@ -328,7 +328,8 @@ export default function MyAgenda() {
                                   className={`${cls} p-2 text-[10px] leading-tight flex-1 flex flex-col gap-0.5 min-h-0 overflow-hidden relative z-0`}
                                 >
                                   <div className="flex items-center justify-between gap-1">
-                                    <span className="font-mono-label text-[8px] opacity-70 truncate">
+                                    {/* Removí truncate para que la hora baje si no cabe */}
+                                    <span className="font-mono-label text-[8px] opacity-70">
                                       {a.start_time}—{a.end_time}
                                     </span>
                                     {a.is_floating && (
@@ -342,8 +343,10 @@ export default function MyAgenda() {
                                       </span>
                                     )}
                                   </div>
-                                  <div className="font-medium truncate">{a.client_name}</div>
-                                  <div className="opacity-80 truncate font-serif-display">
+                                  {/* Removí truncate para que el nombre envuelva al siguiente renglón */}
+                                  <div className="font-medium leading-tight break-words">{a.client_name}</div>
+                                  {/* Removí truncate para que el servicio también se vea completo */}
+                                  <div className="opacity-80 font-serif-display leading-tight break-words mt-0.5">
                                     {serviceLabel}
                                   </div>
                                 </div>
