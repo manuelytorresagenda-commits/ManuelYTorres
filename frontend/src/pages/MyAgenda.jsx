@@ -95,7 +95,7 @@ export default function MyAgenda() {
   if (!specialist) return null;
 
   return (
-    <div className="min-h-screen bg-white max-w-full overflow-x-hidden" data-testid="my-agenda-page">
+    <div className="min-h-screen bg-white" data-testid="my-agenda-page">
       {/* Top bar */}
       <header className="border-b border-black px-6 lg:px-12 py-6 flex items-center justify-between gap-6 flex-wrap">
         <div className="flex items-center gap-4">
@@ -230,10 +230,10 @@ export default function MyAgenda() {
                                       </span>
                                     )}
                                   </div>
-                                  <div className="font-serif-display text-2xl lg:text-3xl leading-tight">
+                                  <div className="font-serif-display text-2xl lg:text-3xl leading-tight truncate">
                                     {a.client_name}
                                   </div>
-                                  <div className="text-sm mt-1 opacity-80">{serviceLabel}</div>
+                                  <div className="text-sm mt-1 opacity-80 truncate">{serviceLabel}</div>
                                 </div>
                               );
                             })}
@@ -250,18 +250,15 @@ export default function MyAgenda() {
             </div>
           )
         ) : (
-          <div className="overflow-x-auto border border-black relative">
-            <table className="w-full border-separate border-spacing-0 text-xs table-fixed min-w-[700px]" data-testid="my-week-grid">
+          <div className="overflow-x-auto border border-black">
+            <table className="w-full border-collapse text-xs" data-testid="my-week-grid">
               <thead>
                 <tr>
-                  {/* Cambio: borde gris suave (border-neutral-200) en lugar de black */}
-                  <th className="sticky left-0 z-50 bg-white border-b border-r border-neutral-200 p-2 w-16 font-mono-label text-[9px] text-neutral-500 shadow-[4px_0_8px_rgba(0,0,0,0.08)]">
-                    HORA
-                  </th>
+                  <th className="border-b border-r border-neutral-300 p-2 w-16 font-mono-label text-[9px] text-neutral-500">HORA</th>
                   {days.map((d, i) => {
                     const isToday = d.toDateString() === new Date().toDateString();
                     return (
-                      <th key={i} className={`border-b border-r border-neutral-300 last:border-r-0 p-3 text-left min-w-[100px] relative z-0 ${isToday ? "bg-black text-white" : "bg-white"}`}>
+                      <th key={i} className={`border-b border-r border-neutral-300 last:border-r-0 p-3 text-left ${isToday ? "bg-black text-white" : ""}`}>
                         <div className="font-mono-label text-[9px] opacity-70">{DAYS_ES[i]}</div>
                         <div className="font-serif-display text-2xl leading-none mt-1">{d.getDate()}</div>
                       </th>
@@ -274,8 +271,7 @@ export default function MyAgenda() {
                   const timeLabel = minToTime(slotMin);
                   return (
                   <tr key={slotMin}>
-                    {/* Cambio: borde gris suave (border-neutral-200) */}
-                    <td className="sticky left-0 z-40 bg-white border-b border-r border-neutral-200 p-2 align-top font-mono-label text-[9px] text-neutral-500 shadow-[4px_0_8px_rgba(0,0,0,0.08)]">
+                    <td className="border-b border-r border-neutral-200 p-2 align-top font-mono-label text-[9px] text-neutral-500">
                       {timeLabel}
                     </td>
                     {days.map((d, i) => {
@@ -283,7 +279,7 @@ export default function MyAgenda() {
                       const bucket = weekGrid[ds];
                       if (!bucket) {
                         return (
-                          <td key={i} className="border-b border-r border-neutral-200 last:border-r-0 p-1 align-top h-[30px] relative z-0" />
+                          <td key={i} className="border-b border-r border-neutral-200 last:border-r-0 p-1 align-top h-[30px]" />
                         );
                       }
                       if (bucket.coveredSlots.has(slotMin)) return null;
@@ -296,7 +292,7 @@ export default function MyAgenda() {
                           key={i}
                           rowSpan={maxSpan || 1}
                           data-testid={`my-week-cell-${ds}-${timeLabel}`}
-                          className="border-b border-r border-neutral-200 last:border-r-0 p-1 align-top h-[30px] relative z-0"
+                          className="border-b border-r border-neutral-200 last:border-r-0 p-1 align-top h-[30px] relative"
                         >
                           {groupCount > 1 && (
                             <span
@@ -306,7 +302,7 @@ export default function MyAgenda() {
                               ×{groupCount}
                             </span>
                           )}
-                          <div className="flex flex-col gap-1 h-full relative z-0">
+                          <div className="flex flex-col gap-1 h-full">
                             {apptList.map((a) => {
                               const sv = findService(a.service_id);
                               const cls = a.is_floating
@@ -325,28 +321,25 @@ export default function MyAgenda() {
                                 <div
                                   key={a.id}
                                   data-testid={`my-week-appt-${a.id}`}
-                                  className={`${cls} p-2 text-[10px] leading-tight flex-1 flex flex-col gap-0.5 min-h-0 overflow-hidden relative z-0`}
+                                  className={`${cls} p-2 text-[10px] leading-tight flex-1 flex flex-col gap-0.5 min-h-0`}
                                 >
                                   <div className="flex items-center justify-between gap-1">
-                                    {/* Removí truncate para que la hora baje si no cabe */}
                                     <span className="font-mono-label text-[8px] opacity-70">
                                       {a.start_time}—{a.end_time}
                                     </span>
                                     {a.is_floating && (
-                                      <span className="font-mono-label text-[7px] bg-sky-400 text-black px-1 border border-black shrink-0">
+                                      <span className="font-mono-label text-[7px] bg-sky-400 text-black px-1 border border-black">
                                         FLOT
                                       </span>
                                     )}
                                     {a.is_overbooked && !a.is_floating && (
-                                      <span className="font-mono-label text-[7px] bg-amber-400 text-black px-1 border border-black shrink-0">
+                                      <span className="font-mono-label text-[7px] bg-amber-400 text-black px-1 border border-black">
                                         EXTRA
                                       </span>
                                     )}
                                   </div>
-                                  {/* Removí truncate para que el nombre envuelva al siguiente renglón */}
-                                  <div className="font-medium leading-tight break-words">{a.client_name}</div>
-                                  {/* Removí truncate para que el servicio también se vea completo */}
-                                  <div className="opacity-80 font-serif-display leading-tight break-words mt-0.5">
+                                  <div className="font-medium truncate">{a.client_name}</div>
+                                  <div className="opacity-80 truncate font-serif-display">
                                     {serviceLabel}
                                   </div>
                                 </div>
