@@ -254,7 +254,9 @@ export default function MyAgenda() {
             <table className="w-full border-collapse text-xs" data-testid="my-week-grid">
               <thead>
                 <tr>
-                  <th className="border-b border-r border-neutral-300 p-2 w-16 font-mono-label text-[9px] text-neutral-500">HORA</th>
+                  <th className="sticky left-0 z-20 bg-white border-b border-r border-neutral-300 p-2 w-16 font-mono-label text-[9px] text-neutral-500">
+                    HORA
+                  </th>
                   {days.map((d, i) => {
                     const isToday = d.toDateString() === new Date().toDateString();
                     return (
@@ -271,7 +273,7 @@ export default function MyAgenda() {
                   const timeLabel = minToTime(slotMin);
                   return (
                   <tr key={slotMin}>
-                    <td className="border-b border-r border-neutral-200 p-2 align-top font-mono-label text-[9px] text-neutral-500">
+                    <td className="sticky left-0 z-20 bg-white border-b border-r border-neutral-200 p-2 align-top font-mono-label text-[9px] text-neutral-500">
                       {timeLabel}
                     </td>
                     {days.map((d, i) => {
