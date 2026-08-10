@@ -17,6 +17,13 @@
           }
         </script>
 
+        <!-- WAKE UP RENDER BACKEND (DESPIERTA EL SERVIDOR AUTOMÁTICAMENTE) -->
+        <link rel="preconnect" href="https://manuelytorres.onrender.com" crossorigin />
+        <script>
+          fetch("https://manuelytorres.onrender.com/health", { method: "HEAD", mode: "no-cors" })
+            .catch(function(){});
+        </script>
+
         <meta name="description" content="A product of emergent.sh" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
