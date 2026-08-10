@@ -863,12 +863,21 @@ async def trigger_seed():
     return {"success": True}
 
 
-@api_router.get("/")
-async def root():
+# --- ENDPOINTS DUALES (GET + HEAD) EN EL ROUTER /API Y EN APP RAIZ ---
+@api_router.api_route("/", methods=["GET", "HEAD"])
+async def router_root():
     return {"message": "Clinic API", "ok": True}
 
-@app.get("/health")
-async def health_check():
+@api_router.api_route("/health", methods=["GET", "HEAD"])
+async def router_health_check():
+    return {"status": "ok"}
+
+@app.api_route("/", methods=["GET", "HEAD"])
+async def app_root():
+    return {"message": "Clinic API Root", "ok": True}
+
+@app.api_route("/health", methods=["GET", "HEAD"])
+async def app_health_check():
     return {"status": "ok"}
 
 # Include the router
