@@ -216,10 +216,10 @@ export default function MyAgenda() {
                                   key={a.id}
                                   data-testid={`my-appt-${a.id}`}
                                   className={`border ${STATUS_STYLES[a.status]} ${
-                                    isShortSlot ? "p-2.5 lg:p-3" : "p-4 lg:p-5"
+                                    isShortSlot ? "px-3 py-2" : "p-4"
                                   } flex-1 min-h-0 overflow-hidden flex flex-col justify-between`}
                                 >
-                                  <div>
+                                  <div className="min-h-0 flex-1 flex flex-col justify-center">
                                     <div className="flex items-center gap-2 mb-0.5 flex-wrap">
                                       <Clock className="w-3 h-3 shrink-0" strokeWidth={1.5} />
                                       <span className="font-mono-label text-[9px] opacity-80">
@@ -236,16 +236,14 @@ export default function MyAgenda() {
                                         </span>
                                       )}
                                     </div>
-                                    <div className={`font-serif-display leading-tight truncate ${
-                                      isShortSlot ? "text-xl lg:text-2xl" : "text-2xl lg:text-3xl"
+                                    <div className={`font-serif-display leading-none truncate ${
+                                      isShortSlot ? "text-lg lg:text-xl my-0.5" : "text-2xl lg:text-3xl my-1"
                                     }`}>
                                       {a.client_name}
                                     </div>
-                                  </div>
-                                  <div className={`font-mono-label text-[10px] uppercase opacity-70 truncate ${
-                                    isShortSlot ? "mt-0.5" : "mt-1 text-xs"
-                                  }`}>
-                                    {serviceLabel}
+                                    <div className="font-mono-label text-[9px] lg:text-[10px] uppercase opacity-70 truncate">
+                                      {serviceLabel}
+                                    </div>
                                   </div>
                                 </div>
                               );
