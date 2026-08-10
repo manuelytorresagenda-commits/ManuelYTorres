@@ -208,32 +208,45 @@ export default function MyAgenda() {
                               const serviceLabel = a.is_floating
                                 ? a.custom_service_name
                                 : (sv?.name || "—");
+                              
+                              const isShortSlot = cluster.span === 1;
+
                               return (
                                 <div
                                   key={a.id}
                                   data-testid={`my-appt-${a.id}`}
-                                  className={`border ${STATUS_STYLES[a.status]} p-4 lg:p-5 flex-1 min-h-0 overflow-hidden`}
+                                  className={`border ${STATUS_STYLES[a.status]} ${
+                                    isShortSlot ? "p-2.5 lg:p-3" : "p-4 lg:p-5"
+                                  } flex-1 min-h-0 overflow-hidden flex flex-col justify-between`}
                                 >
-                                  <div className="flex items-center gap-3 mb-1">
-                                    <Clock className="w-3 h-3" strokeWidth={1.5} />
-                                    <span className="font-mono-label text-[10px]">
-                                      {a.start_time} — {a.end_time} · {a.status}
-                                    </span>
-                                    {a.is_floating && (
-                                      <span className="font-mono-label text-[8px] bg-sky-400 text-black px-1.5 py-0.5 border border-black">
-                                        FLOTANTE
+                                  <div>
+                                    <div className="flex items-center gap-2 mb-0.5 flex-wrap">
+                                      <Clock className="w-3 h-3 shrink-0" strokeWidth={1.5} />
+                                      <span className="font-mono-label text-[9px] opacity-80">
+                                        {a.start_time} — {a.end_time} · {a.status}
                                       </span>
-                                    )}
-                                    {a.is_overbooked && !a.is_floating && (
-                                      <span className="font-mono-label text-[8px] bg-amber-400 text-black px-1.5 py-0.5 border border-black">
-                                        EXTRA
-                                      </span>
-                                    )}
+                                      {a.is_floating && (
+                                        <span className="font-mono-label text-[7px] bg-sky-400 text-black px-1 py-0.2 border border-black">
+                                          FLOTANTE
+                                        </span>
+                                      )}
+                                      {a.is_overbooked && !a.is_floating && (
+                                        <span className="font-mono-label text-[7px] bg-amber-400 text-black px-1 py-0.2 border border-black">
+                                          EXTRA
+                                        </span>
+                                      )}
+                                    </div>
+                                    <div className={`font-serif-display leading-tight truncate ${
+                                      isShortSlot ? "text-xl lg:text-2xl" : "text-2xl lg:text-3xl"
+                                    }`}>
+                                      {a.client_name}
+                                    </div>
                                   </div>
-                                  <div className="font-serif-display text-2xl lg:text-3xl leading-tight">
-                                    {a.client_name}
+                                  <div className={`font-mono-label text-[10px] uppercase opacity-70 truncate ${
+                                    isShortSlot ? "mt-0.5" : "mt-1 text-xs"
+                                  }`}>
+                                    {serviceLabel}
                                   </div>
-                                  <div className="text-sm mt-1 opacity-80">{serviceLabel}</div>
                                 </div>
                               );
                             })}
@@ -254,7 +267,6 @@ export default function MyAgenda() {
             <table className="w-full border-separate border-spacing-0 text-xs table-fixed min-w-[700px]" data-testid="my-week-grid">
               <thead>
                 <tr>
-                  {/* Cambio: borde gris suave (border-neutral-200) en lugar de black */}
                   <th className="sticky left-0 z-50 bg-white border-b border-r border-neutral-200 p-2 w-16 font-mono-label text-[9px] text-neutral-500 shadow-[4px_0_8px_rgba(0,0,0,0.08)]">
                     HORA
                   </th>
@@ -274,7 +286,6 @@ export default function MyAgenda() {
                   const timeLabel = minToTime(slotMin);
                   return (
                   <tr key={slotMin}>
-                    {/* Cambio: borde gris suave (border-neutral-200) */}
                     <td className="sticky left-0 z-40 bg-white border-b border-r border-neutral-200 p-2 align-top font-mono-label text-[9px] text-neutral-500 shadow-[4px_0_8px_rgba(0,0,0,0.08)]">
                       {timeLabel}
                     </td>
@@ -328,7 +339,6 @@ export default function MyAgenda() {
                                   className={`${cls} p-2 text-[10px] leading-tight flex-1 flex flex-col gap-0.5 min-h-0 overflow-hidden relative z-0`}
                                 >
                                   <div className="flex items-center justify-between gap-1">
-                                    {/* Removí truncate para que la hora baje si no cabe */}
                                     <span className="font-mono-label text-[8px] opacity-70">
                                       {a.start_time}—{a.end_time}
                                     </span>
@@ -343,9 +353,7 @@ export default function MyAgenda() {
                                       </span>
                                     )}
                                   </div>
-                                  {/* Removí truncate para que el nombre envuelva al siguiente renglón */}
                                   <div className="font-medium leading-tight break-words">{a.client_name}</div>
-                                  {/* Removí truncate para que el servicio también se vea completo */}
                                   <div className="opacity-80 font-serif-display leading-tight break-words mt-0.5">
                                     {serviceLabel}
                                   </div>
