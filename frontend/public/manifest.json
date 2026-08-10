@@ -1,10 +1,11 @@
 {
-  "short_name": "Agenda M&T",
-  "name": "Agenda de Citas Manuel & Torres",
+  "short_name": "Agenda",
+  "name": "Agenda M&T",
+  "id": "/",
   "start_url": "/",
   "background_color": "#ffffff",
   "theme_color": "#000000",
-  "display": "standalone",
+  "display": "fullscreen",
   "orientation": "portrait",
   "icons": [
     {
