@@ -225,30 +225,42 @@ def _normalize_birthday(value: Optional[str]) -> str:
     return v
 
 
+# --- LÓGICA DE CLIENTES MEJORADA PARA SOPORTAR FAMILIARES CON EL MISMO TELÉFONO ---
 async def _upsert_client(name: str, phone: str, instagram: str, tiktok: str, birthday: str) -> None:
     if not name:
         return
-    query = {"phone": phone} if phone else {
-        "name": {"$regex": f"^{re.escape(name)}$", "$options": "i"}
-    }
+    
+    clean_name = name.strip()
+    clean_phone = (phone or "").strip()
+    
+    # 1. Busca coincidencia exacta por NOMBRE + TELÉFONO (o solo Nombre si no hay teléfono)
+    query = {"name": {"$regex": f"^{re.escape(clean_name)}$", "$options": "i"}}
+    if clean_phone:
+        query["phone"] = clean_phone
+
     existing = await db.clients.find_one(query, {"_id": 0})
+
+    # 2. Si la persona exacta ya existe, actualiza sus redes y cumpleaños
     if existing:
         update_fields: dict = {}
-        if existing.get("name") != name:
-            update_fields["name"] = name
-        if phone and existing.get("phone") != phone:
-            update_fields["phone"] = phone
         if instagram and existing.get("instagram") != instagram:
             update_fields["instagram"] = instagram
         if tiktok and existing.get("tiktok") != tiktok:
             update_fields["tiktok"] = tiktok
         if birthday and existing.get("birthday") != birthday:
             update_fields["birthday"] = birthday
+            
         if update_fields:
             await db.clients.update_one({"id": existing["id"]}, {"$set": update_fields})
+            
+    # 3. Si el nombre es nuevo (aunque comparta teléfono con un familiar), crea un registro nuevo
     else:
         client_obj = Client(
-            name=name, phone=phone, instagram=instagram, tiktok=tiktok, birthday=birthday
+            name=clean_name, 
+            phone=clean_phone, 
+            instagram=instagram, 
+            tiktok=tiktok, 
+            birthday=birthday
         )
         await db.clients.insert_one(client_obj.model_dump())
 
