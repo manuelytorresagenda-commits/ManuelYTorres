@@ -1,9 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import PageHeader from "../components/PageHeader";
 import SpecialistFilter from "../components/SpecialistFilter";
+import NewAppointmentModal from "../components/NewAppointmentModal";
+import FloatingAppointmentModal from "../components/FloatingAppointmentModal";
+import AppointmentDetailModal from "../components/AppointmentDetailModal";
 import { fetchAppointments, fetchSpecialists, fetchServices } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, Wind } from "lucide-react";
 import { toast } from "sonner";
 import { SLOTS, minToTime, buildOverlapGrid } from "../lib/scheduling";
 
@@ -16,13 +19,7 @@ function startOfWeek(d) {
   return date;
 }
 
-function timeToMin(t) {
-  const [h, m] = t.split(":").map(Number);
-  return h * 60 + m;
-}
-
-const DAYS_ES = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
-// SLOTS / minToTime imported from ../lib/scheduling
+const DAYS_ES = ["LUN", "MAR", "MIÉ", "JUE", "VIE", "SÁB", "DOM"];
 
 export default function WeeklyAgenda() {
   const [weekStart, setWeekStart] = useState(startOfWeek(new Date()));
@@ -31,6 +28,12 @@ export default function WeeklyAgenda() {
   const [services, setServices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filterSpecialist, setFilterSpecialist] = useState("all");
+  const [modalOpen, setModalOpen] = useState(false);
+  const [floatingModalOpen, setFloatingModalOpen] = useState(false);
+  const [modalSpecialistId, setModalSpecialistId] = useState("");
+  const [modalStartTime, setModalStartTime] = useState("");
+  const [modalDate, setModalDate] = useState("");
+  const [detailAppt, setDetailAppt] = useState(null);
   const { branch } = useAuth();
 
   const days = useMemo(() => {
@@ -54,8 +57,11 @@ export default function WeeklyAgenda() {
       setAppointments(a);
       setSpecialists(sp);
       setServices(sv);
-    } catch { toast.error("Error cargando datos"); }
-    finally { setLoading(false); }
+    } catch { 
+      toast.error("Error cargando datos"); 
+    } finally { 
+      setLoading(false); 
+    }
   };
 
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [weekStart, branch]);
@@ -71,8 +77,6 @@ export default function WeeklyAgenda() {
   const findSp = (id) => specialists.find((s) => s.id === id);
   const findSv = (id) => services.find((s) => s.id === id);
 
-  // Build per-day overlap grid (clusters merge overlapping appts so extras /
-  // floating that start mid-way through a primary still render).
   const grid = useMemo(() => {
     const result = {};
     days.forEach((d) => {
@@ -93,6 +97,20 @@ export default function WeeklyAgenda() {
     return `${f(weekStart)} — ${f(end)}`;
   };
 
+  const openModalForCell = (dateStr, slotMin) => {
+    setModalDate(dateStr);
+    setModalStartTime(minToTime(slotMin));
+    setModalSpecialistId(filterSpecialist !== "all" ? filterSpecialist : "");
+    setModalOpen(true);
+  };
+
+  const openModalEmpty = () => {
+    setModalDate(new Date().toISOString().slice(0, 10));
+    setModalStartTime("");
+    setModalSpecialistId("");
+    setModalOpen(true);
+  };
+
   return (
     <div data-testid="weekly-agenda-page">
       <PageHeader
@@ -102,25 +120,46 @@ export default function WeeklyAgenda() {
         description="Vista calendario de toda la semana. Navegue entre semanas con las flechas."
         action={
           <div className="flex items-center gap-2">
-            <button onClick={goPrev} data-testid="week-prev"
-              className="btn-invert border border-black h-12 w-12 flex items-center justify-center hover:bg-black hover:text-white">
-              <ChevronLeft className="w-4 h-4" strokeWidth={1.5} />
+            <button
+              data-testid="header-floating-btn"
+              onClick={() => setFloatingModalOpen(true)}
+              className="btn-invert border border-black bg-sky-400 text-black px-4 py-3 font-mono-label text-[10px] font-bold hover:bg-black hover:text-white flex items-center gap-2"
+            >
+              <Wind className="w-3 h-3" strokeWidth={2} />
+              Cita Flotante
             </button>
-            <button onClick={goToday} data-testid="week-today"
-              className="btn-invert border border-black h-12 px-4 font-mono-label text-[10px] hover:bg-black hover:text-white">
-              HOY
-            </button>
-            <button onClick={goNext} data-testid="week-next"
-              className="btn-invert border border-black h-12 w-12 flex items-center justify-center hover:bg-black hover:text-white">
-              <ChevronRight className="w-4 h-4" strokeWidth={1.5} />
+            <button
+              data-testid="header-new-appointment-btn"
+              onClick={openModalEmpty}
+              className="btn-invert border border-black bg-black text-white px-6 py-3 font-mono-label text-[10px] font-bold hover:bg-white hover:text-black flex items-center gap-2"
+            >
+              <Plus className="w-3 h-3" strokeWidth={2} />
+              Nueva Cita
             </button>
           </div>
         }
       />
 
-      <div className="px-6 lg:px-12 py-4 border-b border-neutral-200">
-        <div className="font-mono-label text-[10px] text-neutral-500">SEMANA EN CURSO</div>
-        <div className="font-serif-display text-3xl mt-1" data-testid="week-range">{fmtRange()}</div>
+      {/* Week navigation strip */}
+      <div className="px-6 lg:px-12 py-5 border-b border-neutral-300 flex items-center justify-between gap-4">
+        <div className="flex items-center gap-2">
+          <button onClick={goPrev} data-testid="week-prev"
+            className="btn-invert border border-black p-2 hover:bg-black hover:text-white flex items-center justify-center">
+            <ChevronLeft className="w-4 h-4" strokeWidth={2} />
+          </button>
+          <button onClick={goToday} data-testid="week-today"
+            className="btn-invert border border-black px-3 py-2 font-mono-label text-[10px] font-bold hover:bg-black hover:text-white">
+            HOY
+          </button>
+          <button onClick={goNext} data-testid="week-next"
+            className="btn-invert border border-black p-2 hover:bg-black hover:text-white flex items-center justify-center">
+            <ChevronRight className="w-4 h-4" strokeWidth={2} />
+          </button>
+        </div>
+        <div>
+          <div className="font-mono-label text-[10px] font-bold text-neutral-800">SEMANA EN CURSO</div>
+          <div className="font-serif-display text-2xl font-bold text-black" data-testid="week-range">{fmtRange()}</div>
+        </div>
       </div>
 
       <SpecialistFilter
@@ -129,21 +168,23 @@ export default function WeeklyAgenda() {
         onChange={setFilterSpecialist}
       />
 
-      <div className="p-6 lg:p-12">
+      <div className="p-4 lg:p-6">
         {loading ? (
-          <div className="text-center py-20 font-mono-label text-xs text-neutral-500">Cargando...</div>
+          <div className="text-center py-20 font-mono-label text-xs font-bold text-black">Cargando semana...</div>
         ) : (
-          <div className="overflow-x-auto border border-black">
-            <table className="w-full border-collapse text-xs" data-testid="weekly-grid">
+          <div className="border border-black overflow-auto max-h-[calc(100vh-260px)]" data-testid="weekly-grid-wrapper">
+            <table className="w-full border-collapse" data-testid="weekly-grid">
               <thead>
                 <tr>
-                  <th className="border-b border-r border-neutral-300 p-2 w-16 font-mono-label text-[9px] text-neutral-500">HORA</th>
+                  <th className="sticky top-0 left-0 z-30 bg-white border-b border-r border-black p-3 text-left font-mono-label text-[10px] font-bold text-black min-w-[90px]">
+                    HORA
+                  </th>
                   {days.map((d, i) => {
                     const isToday = d.toDateString() === new Date().toDateString();
                     return (
-                      <th key={i} className={`border-b border-r border-neutral-300 last:border-r-0 p-3 text-left ${isToday ? "bg-black text-white" : ""}`}>
-                        <div className="font-mono-label text-[9px] opacity-70">{DAYS_ES[i]}</div>
-                        <div className="font-serif-display text-2xl leading-none mt-1">{d.getDate()}</div>
+                      <th key={i} className={`sticky top-0 z-20 border-b border-r border-black p-3 text-left min-w-[150px] ${isToday ? "bg-black text-white" : "bg-white text-black"}`}>
+                        <div className="font-mono-label text-[10px] font-bold opacity-80">{DAYS_ES[i]}</div>
+                        <div className="font-serif-display text-2xl font-bold leading-none mt-1">{d.getDate()}</div>
                       </th>
                     );
                   })}
@@ -153,8 +194,9 @@ export default function WeeklyAgenda() {
                 {SLOTS.map((slotMin) => {
                   const timeLabel = minToTime(slotMin);
                   return (
-                  <tr key={slotMin}>
-                    <td className="border-b border-r border-neutral-200 p-2 align-top font-mono-label text-[9px] text-neutral-500">
+                  <tr key={slotMin} className="align-top">
+                    {/* Celda de Hora Elegante y Legible */}
+                    <td className="sticky left-0 z-10 bg-white border-b border-r border-neutral-300 p-3 font-serif-display text-2xl font-bold text-black leading-none whitespace-nowrap align-middle">
                       {timeLabel}
                     </td>
                     {days.map((d, i) => {
@@ -162,7 +204,7 @@ export default function WeeklyAgenda() {
                       const bucket = grid[ds];
                       if (!bucket) {
                         return (
-                          <td key={i} className="border-b border-r border-neutral-200 last:border-r-0 p-1 align-top h-[30px]" />
+                          <td key={i} className="border-b border-r border-neutral-300 p-2 h-10" />
                         );
                       }
                       if (bucket.coveredSlots.has(slotMin)) return null;
@@ -170,69 +212,94 @@ export default function WeeklyAgenda() {
                       const apptList = cluster ? cluster.appts : [];
                       const maxSpan = cluster ? cluster.span : 0;
                       const groupCount = apptList.length;
+
+                      if (groupCount > 0) {
+                        return (
+                          <td
+                            key={i}
+                            rowSpan={maxSpan || 1}
+                            className="border-b border-r border-neutral-300 p-2 relative align-top"
+                            data-testid={`week-cell-${ds}-${timeLabel}`}
+                          >
+                            {groupCount > 1 && (
+                              <span
+                                data-testid={`week-cell-count-${ds}-${timeLabel}`}
+                                className="absolute top-1 right-1 z-10 font-mono-label text-[8px] font-bold bg-black text-white px-1.5 py-0.5 border border-black"
+                              >
+                                ×{groupCount}
+                              </span>
+                            )}
+                            <div className="flex flex-col gap-1.5 h-full">
+                              {apptList.map((a) => {
+                                const sv = findSv(a.service_id);
+                                const sp = findSp(a.specialist_id);
+                                const cls = a.is_floating
+                                  ? "bg-sky-50 border-2 border-sky-800 border-dashed text-black"
+                                  : a.is_overbooked
+                                  ? "bg-amber-50 border-2 border-black border-dashed text-black"
+                                  : a.status === "En curso"
+                                  ? "bg-black border-2 border-black text-white"
+                                  : a.status === "Finalizada"
+                                  ? "bg-neutral-200 border-2 border-neutral-500 text-neutral-700 line-through"
+                                  : "bg-white border-2 border-black text-black";
+                                const serviceLabel = a.is_floating
+                                  ? a.custom_service_name
+                                  : (sv?.name || "—");
+                                return (
+                                  <div
+                                    key={a.id}
+                                    data-testid={`week-appt-${a.id}`}
+                                    onClick={() => setDetailAppt(a)}
+                                    className={`${cls} p-2 flex-1 flex flex-col gap-1 transition-colors cursor-pointer min-h-0`}
+                                  >
+                                    <div className="flex items-center justify-between gap-1">
+                                      <span className="font-mono-label text-[9px] font-bold">
+                                        {a.start_time}–{a.end_time}
+                                      </span>
+                                      {a.is_floating && (
+                                        <span className="font-mono-label text-[7px] font-bold bg-sky-400 text-black px-1 border border-black">
+                                          FLOT
+                                        </span>
+                                      )}
+                                      {a.is_overbooked && !a.is_floating && (
+                                        <span className="font-mono-label text-[7px] font-bold bg-amber-400 text-black px-1 border border-black">
+                                          EXTRA
+                                        </span>
+                                      )}
+                                    </div>
+                                    <div className="font-serif-display text-base font-bold leading-tight break-words">
+                                      {a.client_name}
+                                    </div>
+                                    <div className="text-[10px] font-semibold opacity-90 leading-tight uppercase">
+                                      {serviceLabel}
+                                    </div>
+                                    {sp && (
+                                      <div className="font-mono-label text-[8px] font-bold opacity-90 uppercase mt-auto">
+                                        {sp.name}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </td>
+                        );
+                      }
+
                       return (
                         <td
                           key={i}
-                          rowSpan={maxSpan || 1}
-                          className="border-b border-r border-neutral-200 last:border-r-0 p-1 align-top h-[30px] relative"
                           data-testid={`week-cell-${ds}-${timeLabel}`}
+                          className="border-b border-r border-neutral-300 p-2 h-10"
                         >
-                          {groupCount > 1 && (
-                            <span
-                              data-testid={`week-cell-count-${ds}-${timeLabel}`}
-                              className="absolute top-0.5 right-0.5 z-10 font-mono-label text-[7px] bg-black text-white px-1 border border-black"
-                            >
-                              ×{groupCount}
-                            </span>
-                          )}
-                          <div className="flex flex-col gap-1 h-full">
-                            {apptList.map((a) => {
-                              const sv = findSv(a.service_id);
-                              const sp = findSp(a.specialist_id);
-                              const cls = a.is_floating
-                                ? "bg-sky-50 border border-sky-700 border-dashed text-black"
-                                : a.is_overbooked
-                                ? "bg-amber-50 border border-black border-dashed text-black"
-                                : a.status === "En curso"
-                                ? "bg-black text-white"
-                                : a.status === "Finalizada"
-                                ? "bg-neutral-100 text-neutral-400 line-through"
-                                : "bg-white border border-black";
-                              const serviceLabel = a.is_floating
-                                ? a.custom_service_name
-                                : (sv?.name || "—");
-                              return (
-                                <div
-                                  key={a.id}
-                                  data-testid={`week-appt-${a.id}`}
-                                  className={`${cls} p-2 text-[10px] leading-tight flex-1 flex flex-col gap-0.5 min-h-0`}
-                                >
-                                  <div className="flex items-center justify-between gap-1">
-                                    <span className="font-mono-label text-[8px] opacity-70">
-                                      {a.start_time}—{a.end_time}
-                                    </span>
-                                    {a.is_floating && (
-                                      <span className="font-mono-label text-[7px] bg-sky-400 text-black px-1 border border-black">
-                                        FLOT
-                                      </span>
-                                    )}
-                                    {a.is_overbooked && !a.is_floating && (
-                                      <span className="font-mono-label text-[7px] bg-amber-400 text-black px-1 border border-black">
-                                        EXTRA
-                                      </span>
-                                    )}
-                                  </div>
-                                  <div className="font-medium truncate">{a.client_name}</div>
-                                  <div className="opacity-80 truncate font-serif-display">
-                                    {serviceLabel}
-                                  </div>
-                                  <div className="opacity-60 truncate font-mono-label text-[8px]">
-                                    {sp?.name?.split(" ")[0]}
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
+                          <button
+                            type="button"
+                            onClick={() => openModalForCell(ds, slotMin)}
+                            className="w-full h-full flex items-center justify-center text-neutral-500 hover:text-black hover:bg-neutral-100 border border-dashed border-neutral-300 hover:border-black transition-colors"
+                            aria-label={`Agendar ${ds} a las ${timeLabel}`}
+                          >
+                            <Plus className="w-4 h-4" strokeWidth={2} />
+                          </button>
                         </td>
                       );
                     })}
@@ -244,6 +311,32 @@ export default function WeeklyAgenda() {
           </div>
         )}
       </div>
+
+      <NewAppointmentModal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        onCreated={load}
+        specialists={specialists}
+        specialistId={modalSpecialistId}
+        startTime={modalStartTime}
+        date={modalDate}
+      />
+
+      <FloatingAppointmentModal
+        open={floatingModalOpen}
+        onClose={() => setFloatingModalOpen(false)}
+        onCreated={load}
+        specialists={specialists}
+      />
+
+      <AppointmentDetailModal
+        open={!!detailAppt}
+        onClose={() => setDetailAppt(null)}
+        onUpdated={load}
+        appointment={detailAppt}
+        specialist={detailAppt ? findSp(detailAppt.specialist_id) : null}
+        service={detailAppt ? findSv(detailAppt.service_id) : null}
+      />
     </div>
   );
 }
