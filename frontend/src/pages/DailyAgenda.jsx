@@ -16,27 +16,23 @@ import { Plus, Trash2, Play, CheckCircle2, Calendar, Wind } from "lucide-react";
 import { toast } from "sonner";
 import { SLOTS, timeToMin, minToTime, buildOverlapGrid } from "../lib/scheduling";
 
-// Half-hour slots (08:00 — 20:30) and time helpers come from ../lib/scheduling.
-
 const STATUS_STYLES = {
   Confirmada: "bg-white border-black text-black",
   "En curso": "bg-black border-black text-white",
-  Finalizada: "bg-neutral-200 border-neutral-400 text-neutral-500 line-through",
+  Finalizada: "bg-neutral-200 border-neutral-500 text-neutral-700 line-through",
 };
 
 const OVERBOOKED_STYLES = {
   Confirmada: "bg-amber-50 border-black text-black border-dashed",
   "En curso": "bg-amber-100 border-black text-black border-dashed",
-  Finalizada: "bg-amber-50 border-neutral-400 text-neutral-500 line-through border-dashed",
+  Finalizada: "bg-amber-50 border-neutral-500 text-neutral-700 line-through border-dashed",
 };
 
 const FLOATING_STYLES = {
-  Confirmada: "bg-sky-50 border-sky-700 text-black border-dashed",
-  "En curso": "bg-sky-100 border-sky-700 text-black border-dashed",
-  Finalizada: "bg-sky-50 border-neutral-400 text-neutral-500 line-through border-dashed",
+  Confirmada: "bg-sky-50 border-sky-800 text-black border-dashed",
+  "En curso": "bg-sky-100 border-sky-800 text-black border-dashed",
+  Finalizada: "bg-sky-50 border-neutral-500 text-neutral-700 line-through border-dashed",
 };
-
-// timeToMin imported from ../lib/scheduling
 
 export default function DailyAgenda() {
   const [appointments, setAppointments] = useState([]);
@@ -86,10 +82,6 @@ export default function DailyAgenda() {
     return appointments.filter((a) => a.specialist_id === filterSpecialist);
   }, [appointments, filterSpecialist]);
 
-  // Build a per-specialist overlap grid using shared helper. Multiple
-  // appointments that overlap (incl. extras / floating) collapse into a single
-  // anchored cluster so they ALL render even if they start mid-way through a
-  // primary appointment.
   const grid = useMemo(() => {
     const result = {};
     visibleSpecialists.forEach((sp) => {
@@ -158,7 +150,7 @@ export default function DailyAgenda() {
             <button
               data-testid="header-floating-btn"
               onClick={() => setFloatingModalOpen(true)}
-              className="btn-invert border border-black bg-sky-400 text-black px-4 py-3 font-mono-label text-[10px] hover:bg-black hover:text-white flex items-center gap-2"
+              className="btn-invert border border-black bg-sky-400 text-black px-4 py-3 font-mono-label text-[10px] font-bold hover:bg-black hover:text-white flex items-center gap-2"
             >
               <Wind className="w-3 h-3" strokeWidth={2} />
               Cita Flotante
@@ -166,7 +158,7 @@ export default function DailyAgenda() {
             <button
               data-testid="header-new-appointment-btn"
               onClick={openModalEmpty}
-              className="btn-invert border border-black bg-black text-white px-6 py-3 font-mono-label text-[10px] hover:bg-white hover:text-black flex items-center gap-2"
+              className="btn-invert border border-black bg-black text-white px-6 py-3 font-mono-label text-[10px] font-bold hover:bg-white hover:text-black flex items-center gap-2"
             >
               <Plus className="w-3 h-3" strokeWidth={2} />
               Nueva Cita
@@ -182,21 +174,21 @@ export default function DailyAgenda() {
       />
 
       {/* Date picker strip */}
-      <div className="px-6 lg:px-12 py-5 border-b border-neutral-200 flex items-center gap-4" data-testid="date-picker-strip">
-        <Calendar className="w-3 h-3 text-neutral-500" strokeWidth={1.5} />
-        <span className="font-mono-label text-[10px] text-neutral-500">Fecha</span>
+      <div className="px-6 lg:px-12 py-5 border-b border-neutral-300 flex items-center gap-4" data-testid="date-picker-strip">
+        <Calendar className="w-3.5 h-3.5 text-black" strokeWidth={2} />
+        <span className="font-mono-label text-[10px] font-bold text-black">Fecha</span>
         <input
           type="date"
           data-testid="agenda-date-input"
           value={date}
           onChange={(e) => setDate(e.target.value)}
-          className="border border-black px-3 py-2 bg-white font-mono-label text-xs outline-none focus:ring-1 focus:ring-black focus:ring-offset-2"
+          className="border border-black px-3 py-2 bg-white font-mono-label text-xs font-semibold text-black outline-none focus:ring-1 focus:ring-black focus:ring-offset-2"
         />
         <button
           type="button"
           data-testid="agenda-today-btn"
           onClick={() => setDate(new Date().toISOString().slice(0, 10))}
-          className="btn-invert border border-black px-3 py-2 font-mono-label text-[10px] hover:bg-black hover:text-white"
+          className="btn-invert border border-black px-3 py-2 font-mono-label text-[10px] font-bold hover:bg-black hover:text-white"
         >
           HOY
         </button>
@@ -212,10 +204,10 @@ export default function DailyAgenda() {
           <div
             key={s.label}
             data-testid={s.testid}
-            className={`p-6 lg:p-8 ${i < 2 ? "border-r border-neutral-200" : ""}`}
+            className={`p-6 lg:p-8 ${i < 2 ? "border-r border-neutral-300" : ""}`}
           >
-            <div className="font-mono-label text-[10px] text-neutral-500">{s.label}</div>
-            <div className="font-serif-display text-5xl lg:text-6xl mt-2 leading-none">
+            <div className="font-mono-label text-[10px] font-bold text-neutral-800">{s.label}</div>
+            <div className="font-serif-display text-5xl lg:text-6xl mt-2 leading-none text-black">
               {String(s.value).padStart(2, "0")}
             </div>
           </div>
@@ -225,11 +217,11 @@ export default function DailyAgenda() {
       {/* Excel-like timetable */}
       <div className="p-4 lg:p-6">
         {loading ? (
-          <div className="text-center py-20 font-mono-label text-xs text-neutral-500">Cargando...</div>
+          <div className="text-center py-20 font-mono-label text-xs font-bold text-black">Cargando...</div>
         ) : visibleSpecialists.length === 0 ? (
           <div className="border border-black p-12 text-center" data-testid="empty-specialists">
-            <div className="font-serif-display text-3xl mb-2">Sin especialistas</div>
-            <p className="text-sm text-neutral-600">Agregue especialistas para visualizar la cuadrícula.</p>
+            <div className="font-serif-display text-3xl mb-2 text-black">Sin especialistas</div>
+            <p className="text-sm font-medium text-neutral-700">Agregue especialistas para visualizar la cuadrícula.</p>
           </div>
         ) : (
           <div
@@ -240,7 +232,7 @@ export default function DailyAgenda() {
               <thead>
                 <tr>
                   <th
-                    className="sticky top-0 left-0 z-30 bg-white border-r border-b border-black p-3 text-left font-mono-label text-[10px] text-neutral-500 min-w-[80px]"
+                    className="sticky top-0 left-0 z-30 bg-white border-r border-b border-black p-3 text-left font-mono-label text-[10px] font-bold text-black min-w-[80px]"
                   >
                     HORA
                   </th>
@@ -255,16 +247,16 @@ export default function DailyAgenda() {
                           <img
                             src={sp.avatar_url}
                             alt=""
-                            className="w-8 h-8 object-cover grayscale border border-black/20"
+                            className="w-8 h-8 object-cover grayscale border border-black/40"
                           />
                         ) : (
-                          <span className="w-8 h-8 bg-neutral-200 flex items-center justify-center font-mono-label text-[9px] text-neutral-600">
+                          <span className="w-8 h-8 bg-neutral-300 border border-black/20 flex items-center justify-center font-mono-label text-[9px] font-bold text-black">
                             {sp.name.split(" ").map((n) => n[0]).slice(0, 2).join("")}
                           </span>
                         )}
                         <div className="leading-tight">
-                          <div className="font-serif-display text-base">{sp.name}</div>
-                          <div className="font-mono-label text-[9px] text-neutral-500">
+                          <div className="font-serif-display text-base text-black">{sp.name}</div>
+                          <div className="font-mono-label text-[9px] font-bold text-neutral-800">
                             {sp.specialty}
                           </div>
                         </div>
@@ -281,16 +273,15 @@ export default function DailyAgenda() {
                   return (
                   <tr key={slotMin} data-testid={`row-slot-${timeLabel}`} className="align-top">
                     <td
-                      className="sticky left-0 z-10 bg-white border-r border-b border-neutral-200 p-3 font-serif-display text-2xl text-neutral-400 leading-none"
+                      className="sticky left-0 z-10 bg-white border-r border-b border-neutral-300 p-3 font-serif-display text-2xl font-bold text-black leading-none"
                     >
                       {String(hh).padStart(2, "0")}
-                      <span className="text-xs align-top">:{String(mm).padStart(2, "0")}</span>
+                      <span className="text-xs font-semibold text-black align-top">:{String(mm).padStart(2, "0")}</span>
                     </td>
                     {visibleSpecialists.map((sp) => {
                       const cell = grid[sp.id];
                       if (!cell) return null;
                       if (cell.coveredSlots.has(slotMin)) {
-                        // covered by a previous-row appointment via rowSpan
                         return null;
                       }
                       const cluster = cell.startsAt.get(slotMin);
@@ -302,12 +293,12 @@ export default function DailyAgenda() {
                             key={sp.id}
                             rowSpan={maxSpan}
                             data-testid={`cell-${sp.id}-${timeLabel}`}
-                            className="border-r border-b border-neutral-200 p-2 relative"
+                            className="border-r border-b border-neutral-300 p-2 relative"
                           >
                             {groupCount > 1 && (
                               <span
                                 data-testid={`cell-count-${sp.id}-${timeLabel}`}
-                                className="absolute top-1 right-1 z-10 font-mono-label text-[8px] bg-black text-white px-1.5 py-0.5 border border-black"
+                                className="absolute top-1 right-1 z-10 font-mono-label text-[8px] font-bold bg-black text-white px-1.5 py-0.5 border border-black"
                                 aria-label={`${groupCount} citas en este bloque`}
                               >
                                 ×{groupCount}
@@ -332,14 +323,14 @@ export default function DailyAgenda() {
                                     className={`group border-2 ${styles} p-3 flex-1 flex flex-col gap-2 transition-colors cursor-pointer min-h-0`}
                                   >
                                     <div className="flex items-center justify-between gap-2">
-                                      <span className="font-mono-label text-[9px]">
+                                      <span className="font-mono-label text-[9px] font-bold text-black">
                                         {a.start_time} — {a.end_time}
                                       </span>
                                       <div className="flex items-center gap-1">
                                         {a.is_floating && (
                                           <span
                                             data-testid={`floating-badge-${a.id}`}
-                                            className="font-mono-label text-[8px] bg-sky-400 text-black px-1.5 py-0.5 border border-black"
+                                            className="font-mono-label text-[8px] font-bold bg-sky-400 text-black px-1.5 py-0.5 border border-black"
                                           >
                                             FLOTANTE
                                           </span>
@@ -347,26 +338,26 @@ export default function DailyAgenda() {
                                         {a.is_overbooked && !a.is_floating && (
                                           <span
                                             data-testid={`extra-badge-${a.id}`}
-                                            className="font-mono-label text-[8px] bg-amber-400 text-black px-1.5 py-0.5 border border-black"
+                                            className="font-mono-label text-[8px] font-bold bg-amber-400 text-black px-1.5 py-0.5 border border-black"
                                           >
                                             EXTRA
                                           </span>
                                         )}
-                                        <span className="font-mono-label text-[9px] opacity-70">
+                                        <span className="font-mono-label text-[9px] font-bold opacity-90">
                                           {a.status}
                                         </span>
                                       </div>
                                     </div>
-                                    <div className="font-serif-display text-lg leading-tight break-words">
+                                    <div className="font-serif-display text-lg font-bold leading-tight break-words text-black">
                                       {a.client_name}
                                     </div>
-                                    <div className="text-xs opacity-80 leading-snug">
+                                    <div className="text-xs font-semibold opacity-90 leading-snug">
                                       {serviceLabel}
                                     </div>
                                     {Array.isArray(a.additional_services) && a.additional_services.length > 0 && (
                                       <ul
                                         data-testid={`extras-list-${a.id}`}
-                                        className="text-[11px] opacity-80 list-disc list-inside space-y-0.5 leading-tight pl-1"
+                                        className="text-[11px] font-medium opacity-90 list-disc list-inside space-y-0.5 leading-tight pl-1"
                                       >
                                         {a.additional_services.map((ex, i) => (
                                           <li key={ex.id || `${ex.name}-${i}`} className="break-words">
@@ -383,28 +374,28 @@ export default function DailyAgenda() {
                                         <button
                                           onClick={() => changeStatus(a.id, "En curso")}
                                           data-testid={`start-${a.id}`}
-                                          className="btn-invert border border-current px-2 py-1 font-mono-label text-[9px] hover:bg-current hover:text-white flex items-center gap-1"
+                                          className="btn-invert border border-current px-2 py-1 font-mono-label text-[9px] font-bold hover:bg-current hover:text-white flex items-center gap-1"
                                         >
-                                          <Play className="w-2.5 h-2.5" strokeWidth={1.5} /> Iniciar
+                                          <Play className="w-2.5 h-2.5" strokeWidth={2} /> Iniciar
                                         </button>
                                       )}
                                       {a.status === "En curso" && (
                                         <button
                                           onClick={() => changeStatus(a.id, "Finalizada")}
                                           data-testid={`finish-${a.id}`}
-                                          className="btn-invert border border-current px-2 py-1 font-mono-label text-[9px] hover:bg-white hover:text-black flex items-center gap-1"
+                                          className="btn-invert border border-current px-2 py-1 font-mono-label text-[9px] font-bold hover:bg-white hover:text-black flex items-center gap-1"
                                         >
-                                          <CheckCircle2 className="w-2.5 h-2.5" strokeWidth={1.5} />{" "}
+                                          <CheckCircle2 className="w-2.5 h-2.5" strokeWidth={2} />{" "}
                                           Finalizar
                                         </button>
                                       )}
                                       <button
                                         onClick={() => handleDelete(a.id)}
                                         data-testid={`delete-${a.id}`}
-                                        className="btn-invert border border-current/50 p-1 hover:bg-current hover:text-white"
+                                        className="btn-invert border border-current/70 p-1 hover:bg-current hover:text-white"
                                         aria-label="Eliminar"
                                       >
-                                        <Trash2 className="w-2.5 h-2.5" strokeWidth={1.5} />
+                                        <Trash2 className="w-2.5 h-2.5" strokeWidth={2} />
                                       </button>
                                     </div>
                                   </div>
@@ -418,7 +409,7 @@ export default function DailyAgenda() {
                         <td
                           key={sp.id}
                           data-testid={`cell-${sp.id}-${timeLabel}`}
-                          className="border-r border-b border-neutral-200 p-2 h-10"
+                          className="border-r border-b border-neutral-300 p-2 h-10"
                         >
                           {(() => {
                             const shiftStart = timeToMin(sp.start_time);
@@ -428,7 +419,7 @@ export default function DailyAgenda() {
                               return (
                                 <div
                                   data-testid={`out-of-shift-${sp.id}-${timeLabel}`}
-                                  className="w-full h-full bg-neutral-50 border border-dashed border-neutral-100"
+                                  className="w-full h-full bg-neutral-100 border border-dashed border-neutral-300"
                                   aria-label="Fuera de turno"
                                 />
                               );
@@ -438,10 +429,10 @@ export default function DailyAgenda() {
                                 type="button"
                                 data-testid={`add-cell-${sp.id}-${timeLabel}`}
                                 onClick={() => openModal(sp.id, slotMin)}
-                                className="w-full h-full flex items-center justify-center text-neutral-300 hover:text-black hover:bg-neutral-50 border border-dashed border-neutral-200 hover:border-black transition-colors"
+                                className="w-full h-full flex items-center justify-center text-neutral-500 hover:text-black hover:bg-neutral-100 border border-dashed border-neutral-300 hover:border-black transition-colors"
                                 aria-label={`Agendar ${sp.name} a las ${timeLabel}`}
                               >
-                                <Plus className="w-4 h-4" strokeWidth={1.5} />
+                                <Plus className="w-4 h-4" strokeWidth={2} />
                               </button>
                             );
                           })()}
