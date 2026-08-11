@@ -40,7 +40,6 @@ export default function NewAppointmentModal({
   const [notifyWhatsapp, setNotifyWhatsapp] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
-  // Reset form when opened with new props
   useEffect(() => {
     if (open) {
       setSpecialistId(initialSpecialistId || "");
@@ -117,10 +116,6 @@ export default function NewAppointmentModal({
       });
       toast.success(isOverbooked ? "Cita extra registrada" : "Cita registrada");
 
-      // Auto-open WhatsApp deep link with pre-filled confirmation message.
-      // Only for normal appointments (the modal never creates floating ones)
-      // and only when the client has a phone number and the user kept the
-      // toggle enabled.
       if (notifyWhatsapp && clientPhone && clientPhone.replace(/\D/g, "").length >= 8) {
         const opened = openBookingWhatsapp({
           clientName,
@@ -152,17 +147,17 @@ export default function NewAppointmentModal({
     <Dialog open={open} onOpenChange={(v) => !v && onClose && onClose()}>
       <DialogContent
         data-testid="new-appointment-modal"
-        className="max-w-2xl bg-white border border-black rounded-none p-0 gap-0 [&>button]:hidden"
+        className="max-w-2xl bg-white border-2 border-black rounded-none p-0 gap-0 [&>button]:hidden"
       >
         <DialogTitle className="sr-only">Nueva Cita</DialogTitle>
         <DialogDescription className="sr-only">
           Formulario para registrar una nueva cita: seleccione especialista, servicio, cliente, fecha y hora.
         </DialogDescription>
 
-        <div className="flex items-start justify-between p-6 lg:p-8 border-b border-black">
+        <div className="flex items-start justify-between p-6 lg:p-8 border-b-2 border-black">
           <div>
-            <div className="font-mono-label text-[10px] text-neutral-500">REGISTRO</div>
-            <div className="font-serif-display text-3xl lg:text-4xl mt-1 leading-none">
+            <div className="font-mono-label text-[10px] font-bold text-black">REGISTRO</div>
+            <div className="font-serif-display text-3xl lg:text-4xl mt-1 leading-none text-black font-bold">
               Nueva <em className="italic">Cita</em>
             </div>
           </div>
@@ -170,24 +165,24 @@ export default function NewAppointmentModal({
             type="button"
             data-testid="modal-close-btn"
             onClick={onClose}
-            className="btn-invert border border-black p-2 hover:bg-black hover:text-white"
+            className="btn-invert border-2 border-black p-2 hover:bg-black hover:text-white"
             aria-label="Cerrar"
           >
-            <X className="w-3 h-3" strokeWidth={1.5} />
+            <X className="w-4 h-4" strokeWidth={2} />
           </button>
         </div>
 
         <form onSubmit={submit} className="p-6 lg:p-8 space-y-5 max-h-[75vh] overflow-y-auto">
-          {/* Specialist (read-only when preselected) */}
+          {/* Specialist */}
           <div>
-            <label className="font-mono-label text-[9px] text-neutral-500 block mb-2">
+            <label className="font-mono-label text-[10px] font-bold text-black block mb-2">
               ESPECIALISTA
             </label>
             <select
               data-testid="modal-specialist-select"
               value={specialistId}
               onChange={(e) => { setSpecialistId(e.target.value); setStartTime(""); setServiceId(""); }}
-              className="w-full border border-black px-4 py-3 bg-white outline-none focus:ring-1 focus:ring-black focus:ring-offset-2 font-mono-label text-xs"
+              className="w-full border-2 border-black px-4 py-3 bg-white outline-none focus:ring-1 focus:ring-black font-mono-label text-xs font-bold text-black"
             >
               <option value="">— Seleccionar —</option>
               {specialists.map((s) => (
@@ -198,11 +193,11 @@ export default function NewAppointmentModal({
 
           {/* Service */}
           <div>
-            <label className="font-mono-label text-[9px] text-neutral-500 block mb-2">
+            <label className="font-mono-label text-[10px] font-bold text-black block mb-2">
               SERVICIO
             </label>
             <div className="relative mb-2">
-              <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" strokeWidth={1.5} />
+              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-black" strokeWidth={2} />
               <input
                 type="text"
                 data-testid="modal-service-search"
@@ -210,7 +205,7 @@ export default function NewAppointmentModal({
                 onChange={(e) => setServiceQuery(e.target.value)}
                 placeholder="Buscar servicio…"
                 autoComplete="off"
-                className="w-full border border-black pl-9 pr-9 py-2 bg-white outline-none focus:ring-1 focus:ring-black focus:ring-offset-2 font-mono-label text-xs"
+                className="w-full border-2 border-black pl-9 pr-9 py-2 bg-white outline-none focus:ring-1 focus:ring-black font-mono-label text-xs font-bold text-black placeholder:text-neutral-500"
               />
               {serviceQuery && (
                 <button
@@ -218,9 +213,9 @@ export default function NewAppointmentModal({
                   data-testid="modal-service-search-clear"
                   onClick={() => setServiceQuery("")}
                   aria-label="Limpiar búsqueda"
-                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-neutral-500 hover:text-black"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-black hover:opacity-70"
                 >
-                  <X className="w-3 h-3" strokeWidth={1.5} />
+                  <X className="w-3.5 h-3.5" strokeWidth={2} />
                 </button>
               )}
             </div>
@@ -238,7 +233,7 @@ export default function NewAppointmentModal({
                 return (
                   <div
                     data-testid="modal-service-empty"
-                    className="border border-dashed border-neutral-300 p-4 text-center font-mono-label text-[10px] text-neutral-500"
+                    className="border-2 border-dashed border-neutral-300 p-4 text-center font-mono-label text-[10px] font-bold text-black"
                   >
                     Sin coincidencias para “{serviceQuery}”
                   </div>
@@ -252,13 +247,13 @@ export default function NewAppointmentModal({
                       type="button"
                       data-testid={`modal-service-${s.id}`}
                       onClick={() => { setServiceId(s.id); }}
-                      className={`btn-invert border p-3 text-left ${
-                        serviceId === s.id ? "border-black bg-black text-white" : "border-neutral-300 hover:border-black"
+                      className={`btn-invert border-2 p-3 text-left ${
+                        serviceId === s.id ? "border-black bg-black text-white" : "border-neutral-300 hover:border-black text-black"
                       }`}
                     >
-                      <div className="font-serif-display text-base leading-tight">{s.name}</div>
-                      <div className="font-mono-label text-[9px] opacity-60 mt-1">
-                        {s.duration_minutes} MIN · ${s.cost}
+                      <div className="font-serif-display text-base font-bold leading-tight">{s.name}</div>
+                      <div className="font-mono-label text-[9px] font-bold opacity-80 mt-1">
+                        {s.duration_minutes} MIN
                       </div>
                     </button>
                   ))}
@@ -266,7 +261,7 @@ export default function NewAppointmentModal({
               );
             })()}
             {serviceQuery && (
-              <div className="font-mono-label text-[9px] text-neutral-500 mt-1">
+              <div className="font-mono-label text-[9px] font-bold text-black mt-1">
                 {(() => {
                   const norm = (s) => (s || "").toString().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
                   const q = norm(serviceQuery.trim());
@@ -279,7 +274,7 @@ export default function NewAppointmentModal({
 
           {/* Client */}
           <div>
-            <label className="font-mono-label text-[9px] text-neutral-500 block mb-2">CLIENTE</label>
+            <label className="font-mono-label text-[10px] font-bold text-black block mb-2">CLIENTE</label>
             <ClientAutocomplete
               testid="modal-client-name-input"
               value={clientName}
@@ -298,8 +293,8 @@ export default function NewAppointmentModal({
 
           {/* Phone */}
           <div>
-            <label className="font-mono-label text-[9px] text-neutral-500 block mb-2">
-              TELÉFONO <span className="opacity-60">(opcional)</span>
+            <label className="font-mono-label text-[10px] font-bold text-black block mb-2">
+              TELÉFONO <span className="opacity-70">(opcional)</span>
             </label>
             <input
               data-testid="modal-client-phone-input"
@@ -307,18 +302,18 @@ export default function NewAppointmentModal({
               value={clientPhone}
               onChange={(e) => setClientPhone(e.target.value)}
               placeholder="Ej. 55 1234 5678"
-              className="w-full border border-black px-4 py-3 bg-white outline-none focus:ring-1 focus:ring-black focus:ring-offset-2 font-mono-label text-xs"
+              className="w-full border-2 border-black px-4 py-3 bg-white outline-none focus:ring-1 focus:ring-black font-mono-label text-xs font-bold text-black placeholder:text-neutral-500"
             />
           </div>
 
           {/* Social + birthday */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
             <div>
-              <label className="font-mono-label text-[9px] text-neutral-500 block mb-2 flex items-center gap-1">
-                <Instagram className="w-3 h-3" strokeWidth={1.5} /> INSTAGRAM
+              <label className="font-mono-label text-[10px] font-bold text-black block mb-2 flex items-center gap-1">
+                <Instagram className="w-3.5 h-3.5 text-black" strokeWidth={2} /> INSTAGRAM
               </label>
               <div className="flex">
-                <span className="border border-r-0 border-black px-3 py-3 bg-neutral-100 font-mono-label text-[10px] flex items-center">@</span>
+                <span className="border-2 border-r-0 border-black px-3 py-3 bg-neutral-100 font-mono-label text-[10px] font-bold text-black flex items-center">@</span>
                 <input
                   data-testid="modal-client-instagram-input"
                   type="text"
@@ -326,16 +321,16 @@ export default function NewAppointmentModal({
                   onChange={(e) => setClientInstagram(e.target.value.replace(/^@/, ""))}
                   placeholder="usuario"
                   autoComplete="off"
-                  className="w-full border border-black px-4 py-3 bg-white outline-none focus:ring-1 focus:ring-black focus:ring-offset-2 font-mono-label text-xs"
+                  className="w-full border-2 border-black px-4 py-3 bg-white outline-none focus:ring-1 focus:ring-black font-mono-label text-xs font-bold text-black placeholder:text-neutral-500"
                 />
               </div>
             </div>
             <div>
-              <label className="font-mono-label text-[9px] text-neutral-500 block mb-2 flex items-center gap-1">
-                <Music2 className="w-3 h-3" strokeWidth={1.5} /> TIKTOK
+              <label className="font-mono-label text-[10px] font-bold text-black block mb-2 flex items-center gap-1">
+                <Music2 className="w-3.5 h-3.5 text-black" strokeWidth={2} /> TIKTOK
               </label>
               <div className="flex">
-                <span className="border border-r-0 border-black px-3 py-3 bg-neutral-100 font-mono-label text-[10px] flex items-center">@</span>
+                <span className="border-2 border-r-0 border-black px-3 py-3 bg-neutral-100 font-mono-label text-[10px] font-bold text-black flex items-center">@</span>
                 <input
                   data-testid="modal-client-tiktok-input"
                   type="text"
@@ -343,20 +338,20 @@ export default function NewAppointmentModal({
                   onChange={(e) => setClientTiktok(e.target.value.replace(/^@/, ""))}
                   placeholder="usuario"
                   autoComplete="off"
-                  className="w-full border border-black px-4 py-3 bg-white outline-none focus:ring-1 focus:ring-black focus:ring-offset-2 font-mono-label text-xs"
+                  className="w-full border-2 border-black px-4 py-3 bg-white outline-none focus:ring-1 focus:ring-black font-mono-label text-xs font-bold text-black placeholder:text-neutral-500"
                 />
               </div>
             </div>
             <div>
-              <label className="font-mono-label text-[9px] text-neutral-500 block mb-2 flex items-center gap-1">
-                <Cake className="w-3 h-3" strokeWidth={1.5} /> CUMPLEAÑOS
+              <label className="font-mono-label text-[10px] font-bold text-black block mb-2 flex items-center gap-1">
+                <Cake className="w-3.5 h-3.5 text-black" strokeWidth={2} /> CUMPLEAÑOS
               </label>
               <input
                 data-testid="modal-client-birthday-input"
                 type="date"
                 value={clientBirthday}
                 onChange={(e) => setClientBirthday(e.target.value)}
-                className="w-full border border-black px-4 py-3 bg-white outline-none focus:ring-1 focus:ring-black focus:ring-offset-2 font-mono-label text-xs"
+                className="w-full border-2 border-black px-4 py-3 bg-white outline-none focus:ring-1 focus:ring-black font-mono-label text-xs font-bold text-black"
               />
             </div>
           </div>
@@ -364,17 +359,17 @@ export default function NewAppointmentModal({
           {/* Date + Hour */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="font-mono-label text-[9px] text-neutral-500 block mb-2">FECHA</label>
+              <label className="font-mono-label text-[10px] font-bold text-black block mb-2">FECHA</label>
               <input
                 data-testid="modal-date-input"
                 type="date"
                 value={date}
                 onChange={(e) => { setDate(e.target.value); setStartTime(""); }}
-                className="w-full border border-black px-4 py-3 bg-white outline-none focus:ring-1 focus:ring-black focus:ring-offset-2 font-mono-label text-xs"
+                className="w-full border-2 border-black px-4 py-3 bg-white outline-none focus:ring-1 focus:ring-black font-mono-label text-xs font-bold text-black"
               />
             </div>
             <div>
-              <label className="font-mono-label text-[9px] text-neutral-500 block mb-2">
+              <label className="font-mono-label text-[10px] font-bold text-black block mb-2">
                 HORA INICIO
               </label>
               <input
@@ -382,7 +377,7 @@ export default function NewAppointmentModal({
                 type="time"
                 value={startTime}
                 onChange={(e) => setStartTime(e.target.value)}
-                className="w-full border border-black px-4 py-3 bg-white outline-none focus:ring-1 focus:ring-black focus:ring-offset-2 font-mono-label text-xs"
+                className="w-full border-2 border-black px-4 py-3 bg-white outline-none focus:ring-1 focus:ring-black font-mono-label text-xs font-bold text-black"
               />
             </div>
           </div>
@@ -390,11 +385,11 @@ export default function NewAppointmentModal({
           {/* Slots suggestion */}
           {sp && sv && (
             <div>
-              <label className="font-mono-label text-[9px] text-neutral-500 block mb-2">
+              <label className="font-mono-label text-[10px] font-bold text-black block mb-2">
                 HORARIOS DISPONIBLES (sugeridos)
               </label>
               {slots.length === 0 ? (
-                <div className="text-xs text-neutral-500 border border-dashed border-neutral-300 p-4">
+                <div className="text-xs font-bold text-black border-2 border-dashed border-neutral-300 p-4">
                   No hay turnos disponibles.
                 </div>
               ) : (
@@ -406,12 +401,12 @@ export default function NewAppointmentModal({
                       data-testid={`modal-slot-${s.time}`}
                       disabled={s.conflict}
                       onClick={() => setStartTime(s.time)}
-                      className={`btn-invert border py-2 px-2 font-mono-label text-[10px] ${
+                      className={`btn-invert border-2 py-2 px-2 font-mono-label text-[10px] font-bold ${
                         s.conflict
                           ? "border-neutral-200 text-neutral-300 line-through cursor-not-allowed"
                           : startTime === s.time
                           ? "border-black bg-black text-white"
-                          : "border-neutral-300 hover:border-black"
+                          : "border-neutral-300 text-black hover:border-black"
                       }`}
                     >
                       {s.time}
@@ -425,13 +420,13 @@ export default function NewAppointmentModal({
           {/* Cita Extra toggle */}
           <label
             data-testid="overbooked-toggle"
-            className={`flex items-center justify-between gap-4 border p-3 cursor-pointer btn-invert ${
-              isOverbooked ? "border-black bg-black text-white" : "border-neutral-300 hover:border-black"
+            className={`flex items-center justify-between gap-4 border-2 p-3 cursor-pointer btn-invert ${
+              isOverbooked ? "border-black bg-black text-white" : "border-neutral-300 text-black hover:border-black"
             }`}
           >
             <div>
-              <div className="font-mono-label text-[10px]">CITA EXTRA (SOBRECUPO)</div>
-              <div className="text-[11px] opacity-70 mt-1">
+              <div className="font-mono-label text-[10px] font-bold">CITA EXTRA (SOBRECUPO)</div>
+              <div className="text-[11px] font-medium opacity-80 mt-1">
                 Permite agendar aunque el horario ya esté ocupado.
               </div>
             </div>
@@ -447,15 +442,15 @@ export default function NewAppointmentModal({
           {/* WhatsApp notification toggle */}
           <label
             data-testid="notify-whatsapp-toggle"
-            className={`flex items-center justify-between gap-4 border p-3 cursor-pointer btn-invert ${
-              notifyWhatsapp ? "border-black bg-emerald-50" : "border-neutral-300 hover:border-black"
+            className={`flex items-center justify-between gap-4 border-2 p-3 cursor-pointer btn-invert ${
+              notifyWhatsapp ? "border-black bg-emerald-50 text-black" : "border-neutral-300 text-black hover:border-black"
             }`}
           >
             <div className="flex items-start gap-3">
-              <MessageCircle className="w-4 h-4 mt-0.5 shrink-0" strokeWidth={1.5} />
+              <MessageCircle className="w-4 h-4 mt-0.5 shrink-0 text-black" strokeWidth={2} />
               <div>
-                <div className="font-mono-label text-[10px]">CONFIRMAR POR WHATSAPP</div>
-                <div className="text-[11px] opacity-70 mt-1">
+                <div className="font-mono-label text-[10px] font-bold">CONFIRMAR POR WHATSAPP</div>
+                <div className="text-[11px] font-medium opacity-80 mt-1">
                   {clientPhone
                     ? "Al guardar se abrirá WhatsApp con el mensaje de confirmación pre-armado."
                     : "Agregue un teléfono para habilitar esta opción."}
@@ -474,13 +469,12 @@ export default function NewAppointmentModal({
 
           {/* Summary */}
           {sv && startTime && (
-            <div className="border border-black p-4 bg-neutral-50" data-testid="modal-summary">
-              <div className="font-mono-label text-[9px] text-neutral-500 mb-2">RESUMEN</div>
-              <div className="text-sm">
-                <strong>{startTime}</strong> — {minToTime(timeToMin(startTime) + sv.duration_minutes)}
+            <div className="border-2 border-black p-4 bg-neutral-50 text-black" data-testid="modal-summary">
+              <div className="font-mono-label text-[9px] font-bold text-black mb-2">RESUMEN</div>
+              <div className="text-sm font-bold">
+                {startTime} — {minToTime(timeToMin(startTime) + sv.duration_minutes)}
               </div>
-              <div className="text-xs text-neutral-600 mt-1">{sv.name} · {sp?.name}</div>
-              <div className="text-xs text-neutral-600">Costo: ${sv.cost}</div>
+              <div className="text-xs font-semibold text-neutral-800 mt-1">{sv.name} · {sp?.name}</div>
             </div>
           )}
 
@@ -489,7 +483,7 @@ export default function NewAppointmentModal({
               type="button"
               onClick={onClose}
               data-testid="modal-cancel-btn"
-              className="btn-invert flex-1 border border-black bg-white text-black py-3 font-mono-label text-[10px] hover:bg-neutral-100"
+              className="btn-invert flex-1 border-2 border-black bg-white text-black py-3 font-mono-label text-[10px] font-bold hover:bg-neutral-100"
             >
               CANCELAR
             </button>
@@ -497,7 +491,7 @@ export default function NewAppointmentModal({
               type="submit"
               data-testid="modal-submit-btn"
               disabled={submitting}
-              className="btn-invert flex-1 border border-black bg-black text-white py-3 font-mono-label text-[10px] hover:bg-white hover:text-black disabled:opacity-50"
+              className="btn-invert flex-1 border-2 border-black bg-black text-white py-3 font-mono-label text-[10px] font-bold hover:bg-white hover:text-black disabled:opacity-50"
             >
               {submitting ? "REGISTRANDO..." : "CONFIRMAR CITA"}
             </button>
