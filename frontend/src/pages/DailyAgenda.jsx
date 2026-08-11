@@ -267,14 +267,18 @@ export default function DailyAgenda() {
               </thead>
               <tbody>
                 {SLOTS.map((slotMin) => {
+                  const hh = Math.floor(slotMin / 60);
+                  const mm = slotMin % 60;
                   const timeLabel = minToTime(slotMin);
                   return (
                   <tr key={slotMin} data-testid={`row-slot-${timeLabel}`} className="align-top">
-                    {/* Celda de Hora Uniforme y Legible */}
+                    {/* Celda de Hora Elegante (Serif) */}
                     <td
-                      className="sticky left-0 z-10 bg-white border-r border-b border-neutral-300 p-3 font-mono-label text-lg font-bold text-black leading-none whitespace-nowrap align-middle"
+                      className="sticky left-0 z-10 bg-white border-r border-b border-neutral-300 px-3 py-2.5 font-serif-display text-2xl text-black leading-none whitespace-nowrap align-middle"
                     >
-                      {timeLabel}
+                      {String(hh).padStart(2, "0")}
+                      <span className="text-base text-neutral-700 font-serif-display ml-0.5">:</span>
+                      <span className="text-base text-neutral-700 font-serif-display">{String(mm).padStart(2, "0")}</span>
                     </td>
                     {visibleSpecialists.map((sp) => {
                       const cell = grid[sp.id];
@@ -370,7 +374,7 @@ export default function DailyAgenda() {
                                     >
                                       {a.status === "Confirmada" && (
                                         <button
-                                          onClick={() => changeStatus(a.id, "En curso")}
+                                          onClick={() => changeStatus(a.id, "En cursor")}
                                           data-testid={`start-${a.id}`}
                                           className="btn-invert border border-current px-2 py-1 font-mono-label text-[9px] font-bold hover:bg-current hover:text-white flex items-center gap-1"
                                         >
