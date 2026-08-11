@@ -232,7 +232,7 @@ export default function DailyAgenda() {
               <thead>
                 <tr>
                   <th
-                    className="sticky top-0 left-0 z-30 bg-white border-r border-b border-black p-3 text-left font-mono-label text-[10px] font-bold text-black min-w-[80px]"
+                    className="sticky top-0 left-0 z-30 bg-white border-r border-b border-black p-3 text-left font-mono-label text-[10px] font-bold text-black min-w-[90px]"
                   >
                     HORA
                   </th>
@@ -267,16 +267,14 @@ export default function DailyAgenda() {
               </thead>
               <tbody>
                 {SLOTS.map((slotMin) => {
-                  const hh = Math.floor(slotMin / 60);
-                  const mm = slotMin % 60;
                   const timeLabel = minToTime(slotMin);
                   return (
                   <tr key={slotMin} data-testid={`row-slot-${timeLabel}`} className="align-top">
+                    {/* Celda de Hora Uniforme y Legible */}
                     <td
-                      className="sticky left-0 z-10 bg-white border-r border-b border-neutral-300 p-3 font-serif-display text-2xl font-bold text-black leading-none"
+                      className="sticky left-0 z-10 bg-white border-r border-b border-neutral-300 p-3 font-mono-label text-lg font-bold text-black leading-none whitespace-nowrap align-middle"
                     >
-                      {String(hh).padStart(2, "0")}
-                      <span className="text-xs font-semibold text-black align-top">:{String(mm).padStart(2, "0")}</span>
+                      {timeLabel}
                     </td>
                     {visibleSpecialists.map((sp) => {
                       const cell = grid[sp.id];
