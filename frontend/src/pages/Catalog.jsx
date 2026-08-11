@@ -17,11 +17,11 @@ function Modal({ open, onClose, title, children }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" data-testid="modal">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white border border-black w-full max-w-lg">
-        <div className="flex items-center justify-between border-b border-black p-5">
-          <h3 className="font-serif-display text-2xl">{title}</h3>
-          <button onClick={onClose} data-testid="modal-close" className="btn-invert border border-black w-8 h-8 flex items-center justify-center hover:bg-black hover:text-white">
-            <X className="w-3 h-3" />
+      <div className="relative bg-white border-2 border-black w-full max-w-lg">
+        <div className="flex items-center justify-between border-b-2 border-black p-5">
+          <h3 className="font-serif-display text-2xl font-bold text-black">{title}</h3>
+          <button onClick={onClose} data-testid="modal-close" className="btn-invert border-2 border-black w-8 h-8 flex items-center justify-center hover:bg-black hover:text-white">
+            <X className="w-4 h-4" strokeWidth={2} />
           </button>
         </div>
         <div className="p-6">{children}</div>
@@ -40,28 +40,28 @@ function ServiceForm({ initial, onSubmit, onCancel }) {
       description: form.description || "",
     }); }} className="space-y-4">
       <div>
-        <label className="font-mono-label text-[9px] text-neutral-500 block mb-2">NOMBRE</label>
+        <label className="font-mono-label text-[9px] font-bold text-black block mb-2">NOMBRE</label>
         <input data-testid="service-name-input" required type="text" value={form.name}
           onChange={(e) => upd("name", e.target.value)}
-          className="w-full border border-black px-4 py-3 outline-none font-serif-display text-lg" />
+          className="w-full border-2 border-black px-4 py-3 outline-none font-serif-display text-lg font-bold text-black" />
       </div>
       <div>
-        <label className="font-mono-label text-[9px] text-neutral-500 block mb-2">DURACIÓN (MIN)</label>
+        <label className="font-mono-label text-[9px] font-bold text-black block mb-2">DURACIÓN (MIN)</label>
         <input data-testid="service-duration-input" required type="number" min="5" step="5" value={form.duration_minutes}
           onChange={(e) => upd("duration_minutes", e.target.value)}
-          className="w-full border border-black px-4 py-3 outline-none font-mono-label text-xs" />
+          className="w-full border-2 border-black px-4 py-3 outline-none font-mono-label text-xs font-bold text-black" />
       </div>
       <div>
-        <label className="font-mono-label text-[9px] text-neutral-500 block mb-2">DESCRIPCIÓN</label>
+        <label className="font-mono-label text-[9px] font-bold text-black block mb-2">DESCRIPCIÓN</label>
         <textarea data-testid="service-description-input" rows={2} value={form.description || ""}
           onChange={(e) => upd("description", e.target.value)}
-          className="w-full border border-black px-4 py-3 outline-none text-sm" />
+          className="w-full border-2 border-black px-4 py-3 outline-none text-sm font-medium text-black" />
       </div>
       <div className="flex gap-2 pt-2">
         <button type="button" onClick={onCancel}
-          className="btn-invert flex-1 border border-black py-3 font-mono-label text-[10px] hover:bg-black hover:text-white">CANCELAR</button>
+          className="btn-invert flex-1 border-2 border-black py-3 font-mono-label text-[10px] font-bold hover:bg-black hover:text-white">CANCELAR</button>
         <button type="submit" data-testid="service-submit-btn"
-          className="btn-invert flex-1 border border-black bg-black text-white py-3 font-mono-label text-[10px] hover:bg-white hover:text-black">GUARDAR</button>
+          className="btn-invert flex-1 border-2 border-black bg-black text-white py-3 font-mono-label text-[10px] font-bold hover:bg-white hover:text-black">GUARDAR</button>
       </div>
     </form>
   );
@@ -76,22 +76,22 @@ function SpecialistForm({ initial, onSubmit, onCancel, branches, defaultBranchId
   return (
     <form onSubmit={(e) => { e.preventDefault(); onSubmit(form); }} className="space-y-4">
       <div>
-        <label className="font-mono-label text-[9px] text-neutral-500 block mb-2">NOMBRE</label>
+        <label className="font-mono-label text-[9px] font-bold text-black block mb-2">NOMBRE</label>
         <input data-testid="specialist-name-input" required type="text" value={form.name}
           onChange={(e) => upd("name", e.target.value)}
-          className="w-full border border-black px-4 py-3 outline-none font-serif-display text-lg" />
+          className="w-full border-2 border-black px-4 py-3 outline-none font-serif-display text-lg font-bold text-black" />
       </div>
       <div>
-        <label className="font-mono-label text-[9px] text-neutral-500 block mb-2">ESPECIALIDAD</label>
+        <label className="font-mono-label text-[9px] font-bold text-black block mb-2">ESPECIALIDAD</label>
         <input data-testid="specialist-specialty-input" required type="text" value={form.specialty}
           onChange={(e) => upd("specialty", e.target.value)}
-          className="w-full border border-black px-4 py-3 outline-none text-sm" />
+          className="w-full border-2 border-black px-4 py-3 outline-none text-sm font-medium text-black" />
       </div>
       <div>
-        <label className="font-mono-label text-[9px] text-neutral-500 block mb-2">SUCURSAL</label>
+        <label className="font-mono-label text-[9px] font-bold text-black block mb-2">SUCURSAL</label>
         <select data-testid="specialist-branch-select" required value={form.branch_id || ""}
           onChange={(e) => upd("branch_id", e.target.value)}
-          className="w-full border border-black px-4 py-3 outline-none text-sm bg-white">
+          className="w-full border-2 border-black px-4 py-3 outline-none text-sm font-medium text-black bg-white">
           <option value="">— Seleccione sucursal —</option>
           {branches.map((b) => (
             <option key={b.id} value={b.id}>{b.name}</option>
@@ -100,42 +100,42 @@ function SpecialistForm({ initial, onSubmit, onCancel, branches, defaultBranchId
       </div>
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="font-mono-label text-[9px] text-neutral-500 block mb-2">ENTRADA</label>
+          <label className="font-mono-label text-[9px] font-bold text-black block mb-2">ENTRADA</label>
           <input data-testid="specialist-start-input" required type="time" value={form.start_time}
             onChange={(e) => upd("start_time", e.target.value)}
-            className="w-full border border-black px-4 py-3 outline-none font-mono-label text-xs" />
+            className="w-full border-2 border-black px-4 py-3 outline-none font-mono-label text-xs font-bold text-black" />
         </div>
         <div>
-          <label className="font-mono-label text-[9px] text-neutral-500 block mb-2">SALIDA</label>
+          <label className="font-mono-label text-[9px] font-bold text-black block mb-2">SALIDA</label>
           <input data-testid="specialist-end-input" required type="time" value={form.end_time}
             onChange={(e) => upd("end_time", e.target.value)}
-            className="w-full border border-black px-4 py-3 outline-none font-mono-label text-xs" />
+            className="w-full border-2 border-black px-4 py-3 outline-none font-mono-label text-xs font-bold text-black" />
         </div>
       </div>
       <div>
-        <label className="font-mono-label text-[9px] text-neutral-500 block mb-2">
+        <label className="font-mono-label text-[9px] font-bold text-black block mb-2">
           CÓDIGO DE ACCESO (4 DÍGITOS)
         </label>
         <input data-testid="specialist-access-code-input" type="text" inputMode="numeric" maxLength={4}
           value={form.access_code || ""}
           onChange={(e) => upd("access_code", e.target.value.replace(/\D/g, ""))}
           placeholder="Ej: 1001"
-          className="w-full border border-black px-4 py-3 outline-none font-mono-label text-sm tracking-[0.3em]" />
-        <p className="font-mono-label text-[9px] text-neutral-400 mt-1">
+          className="w-full border-2 border-black px-4 py-3 outline-none font-mono-label text-sm font-bold text-black tracking-[0.3em]" />
+        <p className="font-mono-label text-[9px] font-bold text-neutral-800 mt-1">
           Código que el especialista usará para consultar su agenda.
         </p>
       </div>
       <div>
-        <label className="font-mono-label text-[9px] text-neutral-500 block mb-2">URL AVATAR (OPCIONAL)</label>
+        <label className="font-mono-label text-[9px] font-bold text-black block mb-2">URL AVATAR (OPCIONAL)</label>
         <input data-testid="specialist-avatar-input" type="url" value={form.avatar_url || ""}
           onChange={(e) => upd("avatar_url", e.target.value)}
-          className="w-full border border-black px-4 py-3 outline-none text-xs" />
+          className="w-full border-2 border-black px-4 py-3 outline-none text-xs font-medium text-black" />
       </div>
       <div className="flex gap-2 pt-2">
         <button type="button" onClick={onCancel}
-          className="btn-invert flex-1 border border-black py-3 font-mono-label text-[10px] hover:bg-black hover:text-white">CANCELAR</button>
+          className="btn-invert flex-1 border-2 border-black py-3 font-mono-label text-[10px] font-bold hover:bg-black hover:text-white">CANCELAR</button>
         <button type="submit" data-testid="specialist-submit-btn"
-          className="btn-invert flex-1 border border-black bg-black text-white py-3 font-mono-label text-[10px] hover:bg-white hover:text-black">GUARDAR</button>
+          className="btn-invert flex-1 border-2 border-black bg-black text-white py-3 font-mono-label text-[10px] font-bold hover:bg-white hover:text-black">GUARDAR</button>
       </div>
     </form>
   );
@@ -147,24 +147,24 @@ function BranchForm({ initial, onSubmit, onCancel }) {
   return (
     <form onSubmit={(e) => { e.preventDefault(); onSubmit(form); }} className="space-y-4">
       <div>
-        <label className="font-mono-label text-[9px] text-neutral-500 block mb-2">NOMBRE DE SUCURSAL</label>
+        <label className="font-mono-label text-[9px] font-bold text-black block mb-2">NOMBRE DE SUCURSAL</label>
         <input data-testid="branch-name-input" required type="text" value={form.name}
           onChange={(e) => upd("name", e.target.value)}
           placeholder="Ej: Manuel & Torres · Centro"
-          className="w-full border border-black px-4 py-3 outline-none font-serif-display text-lg" />
+          className="w-full border-2 border-black px-4 py-3 outline-none font-serif-display text-lg font-bold text-black" />
       </div>
       <div>
-        <label className="font-mono-label text-[9px] text-neutral-500 block mb-2">DIRECCIÓN</label>
+        <label className="font-mono-label text-[9px] font-bold text-black block mb-2">DIRECCIÓN</label>
         <input data-testid="branch-address-input" type="text" value={form.address || ""}
           onChange={(e) => upd("address", e.target.value)}
           placeholder="Ej: Av. Reforma 123"
-          className="w-full border border-black px-4 py-3 outline-none text-sm" />
+          className="w-full border-2 border-black px-4 py-3 outline-none text-sm font-medium text-black" />
       </div>
       <div className="flex gap-2 pt-2">
         <button type="button" onClick={onCancel}
-          className="btn-invert flex-1 border border-black py-3 font-mono-label text-[10px] hover:bg-black hover:text-white">CANCELAR</button>
+          className="btn-invert flex-1 border-2 border-black py-3 font-mono-label text-[10px] font-bold hover:bg-black hover:text-white">CANCELAR</button>
         <button type="submit" data-testid="branch-submit-btn"
-          className="btn-invert flex-1 border border-black bg-black text-white py-3 font-mono-label text-[10px] hover:bg-white hover:text-black">GUARDAR</button>
+          className="btn-invert flex-1 border-2 border-black bg-black text-white py-3 font-mono-label text-[10px] font-bold hover:bg-white hover:text-black">GUARDAR</button>
       </div>
     </form>
   );
@@ -177,8 +177,8 @@ export default function Catalog() {
   const [branches, setBranches] = useState([]);
   const [pinDialogBranch, setPinDialogBranch] = useState(null);
   const [deletePinBranch, setDeletePinBranch] = useState(null);
-  const [editing, setEditing] = useState(null); // { type, item }
-  const [creating, setCreating] = useState(null); // type
+  const [editing, setEditing] = useState(null);
+  const [creating, setCreating] = useState(null);
   const { branch } = useAuth();
 
   const load = async () => {
@@ -207,6 +207,7 @@ export default function Catalog() {
       setEditing(null); setCreating(null); load();
     } catch { toast.error("No se pudo guardar"); }
   };
+
   const handleSpecialistSubmit = async (data) => {
     try {
       if (!data.branch_id) {
@@ -219,6 +220,7 @@ export default function Catalog() {
       setEditing(null); setCreating(null); load();
     } catch { toast.error("No se pudo guardar"); }
   };
+
   const handleBranchSubmit = async (data) => {
     try {
       if (editing?.type === "branch") await updateBranch(editing.item.id, data);
@@ -227,16 +229,19 @@ export default function Catalog() {
       setEditing(null); setCreating(null); load();
     } catch { toast.error("No se pudo guardar"); }
   };
+
   const removeService = async (id) => {
     if (!window.confirm("¿Eliminar este servicio?")) return;
     try { await deleteService(id); toast.success("Eliminado"); load(); }
     catch { toast.error("Error al eliminar"); }
   };
+
   const removeSpecialist = async (id) => {
     if (!window.confirm("¿Eliminar este especialista?")) return;
     try { await deleteSpecialist(id); toast.success("Eliminado"); load(); }
     catch { toast.error("Error al eliminar"); }
   };
+
   const removeBranch = async (id) => {
     try { await deleteBranch(id); toast.success("Sucursal eliminada"); load(); }
     catch (e) { toast.error(e.response?.data?.detail || "Error al eliminar"); }
@@ -255,8 +260,8 @@ export default function Catalog() {
   );
 
   const tabBtnClass = (active) =>
-    `btn-invert px-6 lg:px-8 py-4 font-mono-label text-[10px] border-r border-neutral-200 ${
-      active ? "bg-black text-white" : "hover:bg-neutral-100"
+    `btn-invert px-6 lg:px-8 py-4 font-mono-label text-[10px] font-bold border-r border-neutral-300 ${
+      active ? "bg-black text-white" : "bg-white text-black hover:bg-neutral-100"
     }`;
 
   const addLabel = tab === "services" ? "Servicio" : tab === "specialists" ? "Especialista" : "Sucursal";
@@ -273,7 +278,7 @@ export default function Catalog() {
       />
 
       {/* Tabs */}
-      <div className="border-b border-black flex overflow-x-auto">
+      <div className="border-b-2 border-black flex overflow-x-auto bg-white">
         <button data-testid="tab-services" onClick={() => setTab("services")} className={tabBtnClass(tab === "services")}>
           Servicios ({services.length})
         </button>
@@ -287,9 +292,9 @@ export default function Catalog() {
         <button
           data-testid="add-new-btn"
           onClick={() => setCreating(tab === "services" ? "service" : tab === "specialists" ? "specialist" : "branch")}
-          className="btn-invert px-6 py-4 bg-black text-white font-mono-label text-[10px] hover:bg-white hover:text-black hover:border hover:border-black flex items-center gap-2 whitespace-nowrap"
+          className="btn-invert px-6 py-4 bg-black text-white font-mono-label text-[10px] font-bold hover:bg-white hover:text-black hover:border-l-2 hover:border-black flex items-center gap-2 whitespace-nowrap"
         >
-          <Plus className="w-3 h-3" /> Agregar {addLabel}
+          <Plus className="w-3.5 h-3.5" strokeWidth={2} /> Agregar {addLabel}
         </button>
       </div>
 
@@ -298,22 +303,21 @@ export default function Catalog() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" data-testid="services-grid">
             {services.map((s) => (
               <div key={s.id} data-testid={`service-card-${s.id}`}
-                   className="border border-black p-6 flex flex-col">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="font-mono-label text-[9px] text-neutral-500">SERVICIO</div>
-                  <div className="font-serif-display text-xl">${s.cost}</div>
+                   className="border-2 border-black p-6 flex flex-col bg-white">
+                <div className="flex items-start justify-between mb-2">
+                  <div className="font-mono-label text-[9px] font-bold text-black">SERVICIO</div>
                 </div>
-                <h3 className="font-serif-display text-3xl leading-tight">{s.name}</h3>
-                <div className="font-mono-label text-[9px] text-neutral-500 mt-2">{s.duration_minutes} MIN</div>
-                {s.description && <p className="text-xs text-neutral-600 mt-3 flex-1">{s.description}</p>}
+                <h3 className="font-serif-display text-3xl font-bold leading-tight text-black">{s.name}</h3>
+                <div className="font-mono-label text-[10px] font-bold text-neutral-800 mt-2">{s.duration_minutes} MIN</div>
+                {s.description && <p className="text-xs font-medium text-neutral-800 mt-3 flex-1">{s.description}</p>}
                 <div className="flex gap-2 mt-6">
                   <button data-testid={`edit-service-${s.id}`} onClick={() => setEditing({ type: "service", item: s })}
-                    className="btn-invert flex-1 border border-black py-2 font-mono-label text-[9px] hover:bg-black hover:text-white flex items-center justify-center gap-2">
-                    <Pencil className="w-3 h-3" /> EDITAR
+                    className="btn-invert flex-1 border-2 border-black py-2 font-mono-label text-[9px] font-bold text-black hover:bg-black hover:text-white flex items-center justify-center gap-2">
+                    <Pencil className="w-3 h-3" strokeWidth={2} /> EDITAR
                   </button>
                   <button data-testid={`delete-service-${s.id}`} onClick={() => removeService(s.id)}
-                    className="btn-invert border border-black w-10 hover:bg-black hover:text-white flex items-center justify-center">
-                    <Trash2 className="w-3 h-3" />
+                    className="btn-invert border-2 border-black w-10 hover:bg-black hover:text-white flex items-center justify-center">
+                    <Trash2 className="w-3.5 h-3.5" strokeWidth={2} />
                   </button>
                 </div>
               </div>
@@ -325,43 +329,43 @@ export default function Catalog() {
               const br = findBranch(s.branch_id);
               return (
                 <div key={s.id} data-testid={`specialist-card-${s.id}`}
-                     className="border border-black overflow-hidden flex flex-col">
+                     className="border-2 border-black overflow-hidden flex flex-col bg-white">
                   {s.avatar_url ? (
                     <div className="aspect-[4/3] overflow-hidden bg-neutral-100">
                       <img src={s.avatar_url} alt={s.name} className="w-full h-full object-cover grayscale" />
                     </div>
                   ) : (
-                    <div className="aspect-[4/3] bg-neutral-100 flex items-center justify-center">
-                      <span className="font-serif-display text-6xl text-neutral-300">
+                    <div className="aspect-[4/3] bg-neutral-200 border-b-2 border-black flex items-center justify-center">
+                      <span className="font-serif-display text-6xl font-bold text-black">
                         {s.name.split(" ").map(n => n[0]).slice(0, 2).join("")}
                       </span>
                     </div>
                   )}
                   <div className="p-5 flex-1 flex flex-col">
-                    <div className="font-mono-label text-[9px] text-neutral-500">ESPECIALISTA</div>
-                    <h3 className="font-serif-display text-2xl mt-1">{s.name}</h3>
-                    <p className="text-xs text-neutral-600 mt-1">{s.specialty}</p>
+                    <div className="font-mono-label text-[9px] font-bold text-black">ESPECIALISTA</div>
+                    <h3 className="font-serif-display text-2xl font-bold mt-1 text-black">{s.name}</h3>
+                    <p className="text-xs font-semibold text-neutral-800 mt-1">{s.specialty}</p>
                     {br && (
-                      <div className="font-mono-label text-[9px] text-neutral-500 mt-3 flex items-center gap-1">
-                        <MapPin className="w-2.5 h-2.5" /> {br.name.replace(/^Manuel & Torres · /, "")}
+                      <div className="font-mono-label text-[9px] font-bold text-black mt-3 flex items-center gap-1">
+                        <MapPin className="w-3 h-3" strokeWidth={2} /> {br.name.replace(/^Manuel & Torres · /, "")}
                       </div>
                     )}
-                    <div className="font-mono-label text-[9px] text-neutral-500 mt-1">
+                    <div className="font-mono-label text-[9px] font-bold text-neutral-800 mt-1">
                       {s.start_time} — {s.end_time}
                     </div>
                     {s.access_code && (
-                      <div className="font-mono-label text-[9px] text-neutral-500 mt-1">
-                        CÓDIGO · <span className="text-black tracking-[0.3em]" data-testid={`specialist-code-${s.id}`}>{s.access_code}</span>
+                      <div className="font-mono-label text-[9px] font-bold text-black mt-1">
+                        CÓDIGO · <span className="tracking-[0.3em]" data-testid={`specialist-code-${s.id}`}>{s.access_code}</span>
                       </div>
                     )}
                     <div className="flex gap-2 mt-4">
                       <button data-testid={`edit-specialist-${s.id}`} onClick={() => setEditing({ type: "specialist", item: s })}
-                        className="btn-invert flex-1 border border-black py-2 font-mono-label text-[9px] hover:bg-black hover:text-white flex items-center justify-center gap-2">
-                        <Pencil className="w-3 h-3" /> EDITAR
+                        className="btn-invert flex-1 border-2 border-black py-2 font-mono-label text-[9px] font-bold text-black hover:bg-black hover:text-white flex items-center justify-center gap-2">
+                        <Pencil className="w-3 h-3" strokeWidth={2} /> EDITAR
                       </button>
                       <button data-testid={`delete-specialist-${s.id}`} onClick={() => removeSpecialist(s.id)}
-                        className="btn-invert border border-black w-10 hover:bg-black hover:text-white flex items-center justify-center">
-                        <Trash2 className="w-3 h-3" />
+                        className="btn-invert border-2 border-black w-10 hover:bg-black hover:text-white flex items-center justify-center">
+                        <Trash2 className="w-3.5 h-3.5" strokeWidth={2} />
                       </button>
                     </div>
                   </div>
@@ -374,32 +378,32 @@ export default function Catalog() {
             {branches.map((b, i) => {
               const count = specialists.filter((s) => s.branch_id === b.id).length;
               return (
-                <div key={b.id} data-testid={`branch-card-${b.id}`} className="border border-black p-6 flex flex-col">
-                  <div className="font-mono-label text-[9px] text-neutral-500">
+                <div key={b.id} data-testid={`branch-card-${b.id}`} className="border-2 border-black p-6 flex flex-col bg-white">
+                  <div className="font-mono-label text-[9px] font-bold text-black">
                     SUCURSAL {String(i + 1).padStart(2, "0")}
                   </div>
-                  <h3 className="font-serif-display text-3xl leading-tight mt-2">{b.name}</h3>
+                  <h3 className="font-serif-display text-3xl font-bold leading-tight mt-2 text-black">{b.name}</h3>
                   {b.address && (
-                    <div className="flex items-start gap-2 mt-3 text-xs text-neutral-600">
-                      <MapPin className="w-3 h-3 mt-0.5 shrink-0" strokeWidth={1.5} />
+                    <div className="flex items-start gap-2 mt-3 text-xs font-semibold text-neutral-800">
+                      <MapPin className="w-3.5 h-3.5 mt-0.5 shrink-0 text-black" strokeWidth={2} />
                       <span>{b.address}</span>
                     </div>
                   )}
-                  <div className="font-mono-label text-[9px] text-neutral-500 mt-4">
+                  <div className="font-mono-label text-[9px] font-bold text-black mt-4">
                     {count} ESPECIALISTA{count !== 1 ? "S" : ""}
                   </div>
                   <div className="flex gap-2 mt-6">
                     <button data-testid={`change-branch-pin-${b.id}`} onClick={() => setPinDialogBranch(b)}
-                      className="btn-invert flex-1 border border-black py-2 font-mono-label text-[9px] hover:bg-black hover:text-white flex items-center justify-center gap-2">
-                      <KeyRound className="w-3 h-3" /> PIN
+                      className="btn-invert flex-1 border-2 border-black py-2 font-mono-label text-[9px] font-bold text-black hover:bg-black hover:text-white flex items-center justify-center gap-2">
+                      <KeyRound className="w-3 h-3" strokeWidth={2} /> PIN
                     </button>
                     <button data-testid={`edit-branch-${b.id}`} onClick={() => setEditing({ type: "branch", item: b })}
-                      className="btn-invert flex-1 border border-black py-2 font-mono-label text-[9px] hover:bg-black hover:text-white flex items-center justify-center gap-2">
-                      <Pencil className="w-3 h-3" /> EDITAR
+                      className="btn-invert flex-1 border-2 border-black py-2 font-mono-label text-[9px] font-bold text-black hover:bg-black hover:text-white flex items-center justify-center gap-2">
+                      <Pencil className="w-3 h-3" strokeWidth={2} /> EDITAR
                     </button>
                     <button data-testid={`delete-branch-${b.id}`} onClick={() => setDeletePinBranch(b)}
-                      className="btn-invert border border-black w-10 hover:bg-black hover:text-white flex items-center justify-center">
-                      <Trash2 className="w-3 h-3" />
+                      className="btn-invert border-2 border-black w-10 hover:bg-black hover:text-white flex items-center justify-center">
+                      <Trash2 className="w-3.5 h-3.5" strokeWidth={2} />
                     </button>
                   </div>
                 </div>
