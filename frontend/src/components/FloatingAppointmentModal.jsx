@@ -75,23 +75,23 @@ export default function FloatingAppointmentModal({
     <Dialog open={open} onOpenChange={(v) => !v && onClose && onClose()}>
       <DialogContent
         data-testid="floating-appointment-modal"
-        className="max-w-lg bg-white border border-black rounded-none p-0 gap-0 [&>button]:hidden"
+        className="max-w-lg bg-white border-2 border-black rounded-none p-0 gap-0 [&>button]:hidden"
       >
         <DialogTitle className="sr-only">Cita Flotante</DialogTitle>
         <DialogDescription className="sr-only">
           Cita rápida que puede solaparse con horarios ya ocupados.
         </DialogDescription>
 
-        <div className="flex items-start justify-between p-6 border-b border-black bg-sky-50">
+        <div className="flex items-start justify-between p-6 border-b-2 border-black bg-sky-50">
           <div>
             <div className="flex items-center gap-2">
-              <Wind className="w-3 h-3" strokeWidth={1.5} />
-              <span className="font-mono-label text-[10px] text-neutral-500">CITA RÁPIDA</span>
+              <Wind className="w-3.5 h-3.5 text-black" strokeWidth={2} />
+              <span className="font-mono-label text-[10px] font-bold text-black">CITA RÁPIDA</span>
             </div>
-            <div className="font-serif-display text-3xl mt-1 leading-none">
+            <div className="font-serif-display text-3xl mt-1 leading-none text-black font-bold">
               <em className="italic">Flotante</em>
             </div>
-            <div className="text-[11px] text-neutral-600 mt-1">
+            <div className="text-[11px] font-semibold text-neutral-800 mt-1">
               Permite solapar con citas existentes y rellenar huecos.
             </div>
           </div>
@@ -99,23 +99,23 @@ export default function FloatingAppointmentModal({
             type="button"
             data-testid="floating-close-btn"
             onClick={onClose}
-            className="btn-invert border border-black p-2 hover:bg-black hover:text-white"
+            className="btn-invert border-2 border-black p-2 hover:bg-black hover:text-white"
             aria-label="Cerrar"
           >
-            <X className="w-3 h-3" strokeWidth={1.5} />
+            <X className="w-4 h-4" strokeWidth={2} />
           </button>
         </div>
 
         <form onSubmit={submit} className="p-6 space-y-5 max-h-[75vh] overflow-y-auto">
           <div>
-            <label className="font-mono-label text-[9px] text-neutral-500 block mb-2">
+            <label className="font-mono-label text-[10px] font-bold text-black block mb-2">
               ESPECIALISTA
             </label>
             <select
               data-testid="floating-specialist-select"
               value={specialistId}
               onChange={(e) => setSpecialistId(e.target.value)}
-              className="w-full border border-black px-4 py-3 bg-white outline-none focus:ring-1 focus:ring-black focus:ring-offset-2 font-mono-label text-xs"
+              className="w-full border-2 border-black px-4 py-3 bg-white outline-none focus:ring-1 focus:ring-black font-mono-label text-xs font-bold text-black"
             >
               <option value="">— Seleccionar —</option>
               {specialists.map((s) => (
@@ -127,7 +127,7 @@ export default function FloatingAppointmentModal({
           </div>
 
           <div>
-            <label className="font-mono-label text-[9px] text-neutral-500 block mb-2">
+            <label className="font-mono-label text-[10px] font-bold text-black block mb-2">
               SERVICIO / TRABAJO
             </label>
             <input
@@ -136,12 +136,12 @@ export default function FloatingAppointmentModal({
               value={serviceName}
               onChange={(e) => setServiceName(e.target.value)}
               placeholder="Ej. Retoque rápido, Cejas, Consulta..."
-              className="w-full border border-black px-4 py-3 bg-white outline-none focus:ring-1 focus:ring-black focus:ring-offset-2 font-serif-display text-base"
+              className="w-full border-2 border-black px-4 py-3 bg-white outline-none focus:ring-1 focus:ring-black font-serif-display text-base font-bold text-black placeholder:text-neutral-500"
             />
           </div>
 
           <div>
-            <label className="font-mono-label text-[9px] text-neutral-500 block mb-2">CLIENTE</label>
+            <label className="font-mono-label text-[10px] font-bold text-black block mb-2">CLIENTE</label>
             <ClientAutocomplete
               testid="floating-client-name-input"
               value={clientName}
@@ -159,8 +159,8 @@ export default function FloatingAppointmentModal({
           </div>
 
           <div>
-            <label className="font-mono-label text-[9px] text-neutral-500 block mb-2">
-              TELÉFONO <span className="opacity-60">(opcional)</span>
+            <label className="font-mono-label text-[10px] font-bold text-black block mb-2">
+              TELÉFONO <span className="opacity-70">(opcional)</span>
             </label>
             <input
               data-testid="floating-client-phone-input"
@@ -168,17 +168,17 @@ export default function FloatingAppointmentModal({
               value={clientPhone}
               onChange={(e) => setClientPhone(e.target.value)}
               placeholder="Ej. 55 1234 5678"
-              className="w-full border border-black px-4 py-3 bg-white outline-none focus:ring-1 focus:ring-black focus:ring-offset-2 font-mono-label text-xs"
+              className="w-full border-2 border-black px-4 py-3 bg-white outline-none focus:ring-1 focus:ring-black font-mono-label text-xs font-bold text-black placeholder:text-neutral-500"
             />
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
             <div>
-              <label className="font-mono-label text-[9px] text-neutral-500 block mb-2 flex items-center gap-1">
-                <Instagram className="w-3 h-3" strokeWidth={1.5} /> INSTAGRAM
+              <label className="font-mono-label text-[10px] font-bold text-black block mb-2 flex items-center gap-1">
+                <Instagram className="w-3.5 h-3.5 text-black" strokeWidth={2} /> INSTAGRAM
               </label>
               <div className="flex">
-                <span className="border border-r-0 border-black px-3 py-3 bg-neutral-100 font-mono-label text-[10px] flex items-center">@</span>
+                <span className="border-2 border-r-0 border-black px-3 py-3 bg-neutral-100 font-mono-label text-[10px] font-bold text-black flex items-center">@</span>
                 <input
                   data-testid="floating-client-instagram-input"
                   type="text"
@@ -186,16 +186,16 @@ export default function FloatingAppointmentModal({
                   onChange={(e) => setClientInstagram(e.target.value.replace(/^@/, ""))}
                   placeholder="usuario"
                   autoComplete="off"
-                  className="w-full border border-black px-4 py-3 bg-white outline-none focus:ring-1 focus:ring-black focus:ring-offset-2 font-mono-label text-xs"
+                  className="w-full border-2 border-black px-4 py-3 bg-white outline-none focus:ring-1 focus:ring-black font-mono-label text-xs font-bold text-black placeholder:text-neutral-500"
                 />
               </div>
             </div>
             <div>
-              <label className="font-mono-label text-[9px] text-neutral-500 block mb-2 flex items-center gap-1">
-                <Music2 className="w-3 h-3" strokeWidth={1.5} /> TIKTOK
+              <label className="font-mono-label text-[10px] font-bold text-black block mb-2 flex items-center gap-1">
+                <Music2 className="w-3.5 h-3.5 text-black" strokeWidth={2} /> TIKTOK
               </label>
               <div className="flex">
-                <span className="border border-r-0 border-black px-3 py-3 bg-neutral-100 font-mono-label text-[10px] flex items-center">@</span>
+                <span className="border-2 border-r-0 border-black px-3 py-3 bg-neutral-100 font-mono-label text-[10px] font-bold text-black flex items-center">@</span>
                 <input
                   data-testid="floating-client-tiktok-input"
                   type="text"
@@ -203,37 +203,37 @@ export default function FloatingAppointmentModal({
                   onChange={(e) => setClientTiktok(e.target.value.replace(/^@/, ""))}
                   placeholder="usuario"
                   autoComplete="off"
-                  className="w-full border border-black px-4 py-3 bg-white outline-none focus:ring-1 focus:ring-black focus:ring-offset-2 font-mono-label text-xs"
+                  className="w-full border-2 border-black px-4 py-3 bg-white outline-none focus:ring-1 focus:ring-black font-mono-label text-xs font-bold text-black placeholder:text-neutral-500"
                 />
               </div>
             </div>
             <div>
-              <label className="font-mono-label text-[9px] text-neutral-500 block mb-2 flex items-center gap-1">
-                <Cake className="w-3 h-3" strokeWidth={1.5} /> CUMPLEAÑOS
+              <label className="font-mono-label text-[10px] font-bold text-black block mb-2 flex items-center gap-1">
+                <Cake className="w-3.5 h-3.5 text-black" strokeWidth={2} /> CUMPLEAÑOS
               </label>
               <input
                 data-testid="floating-client-birthday-input"
                 type="date"
                 value={clientBirthday}
                 onChange={(e) => setClientBirthday(e.target.value)}
-                className="w-full border border-black px-4 py-3 bg-white outline-none focus:ring-1 focus:ring-black focus:ring-offset-2 font-mono-label text-xs"
+                className="w-full border-2 border-black px-4 py-3 bg-white outline-none focus:ring-1 focus:ring-black font-mono-label text-xs font-bold text-black"
               />
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="font-mono-label text-[9px] text-neutral-500 block mb-2">FECHA</label>
+              <label className="font-mono-label text-[10px] font-bold text-black block mb-2">FECHA</label>
               <input
                 data-testid="floating-date-input"
                 type="date"
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
-                className="w-full border border-black px-4 py-3 bg-white outline-none focus:ring-1 focus:ring-black focus:ring-offset-2 font-mono-label text-xs"
+                className="w-full border-2 border-black px-4 py-3 bg-white outline-none focus:ring-1 focus:ring-black font-mono-label text-xs font-bold text-black"
               />
             </div>
             <div>
-              <label className="font-mono-label text-[9px] text-neutral-500 block mb-2">
+              <label className="font-mono-label text-[10px] font-bold text-black block mb-2">
                 HORA INICIO
               </label>
               <input
@@ -241,13 +241,13 @@ export default function FloatingAppointmentModal({
                 type="time"
                 value={startTime}
                 onChange={(e) => setStartTime(e.target.value)}
-                className="w-full border border-black px-4 py-3 bg-white outline-none focus:ring-1 focus:ring-black focus:ring-offset-2 font-mono-label text-xs"
+                className="w-full border-2 border-black px-4 py-3 bg-white outline-none focus:ring-1 focus:ring-black font-mono-label text-xs font-bold text-black"
               />
             </div>
           </div>
 
           <div>
-            <label className="font-mono-label text-[9px] text-neutral-500 block mb-2">
+            <label className="font-mono-label text-[10px] font-bold text-black block mb-2">
               DURACIÓN (MIN)
             </label>
             <div className="flex flex-wrap gap-2 mb-2">
@@ -257,10 +257,10 @@ export default function FloatingAppointmentModal({
                   type="button"
                   data-testid={`floating-duration-${m}`}
                   onClick={() => setDuration(m)}
-                  className={`btn-invert border px-4 py-2 font-mono-label text-[10px] ${
+                  className={`btn-invert border-2 px-4 py-2 font-mono-label text-[10px] font-bold ${
                     duration === m
                       ? "border-black bg-black text-white"
-                      : "border-neutral-300 hover:border-black"
+                      : "border-neutral-300 text-black hover:border-black"
                   }`}
                 >
                   {m}
@@ -274,7 +274,7 @@ export default function FloatingAppointmentModal({
               step="5"
               value={duration}
               onChange={(e) => setDuration(parseInt(e.target.value) || 0)}
-              className="w-full border border-black px-4 py-2 bg-white outline-none focus:ring-1 focus:ring-black focus:ring-offset-2 font-mono-label text-xs"
+              className="w-full border-2 border-black px-4 py-2 bg-white outline-none focus:ring-1 focus:ring-black font-mono-label text-xs font-bold text-black"
             />
           </div>
 
@@ -283,7 +283,7 @@ export default function FloatingAppointmentModal({
               type="button"
               onClick={onClose}
               data-testid="floating-cancel-btn"
-              className="btn-invert flex-1 border border-black bg-white text-black py-3 font-mono-label text-[10px] hover:bg-neutral-100"
+              className="btn-invert flex-1 border-2 border-black bg-white text-black py-3 font-mono-label text-[10px] font-bold hover:bg-neutral-100"
             >
               CANCELAR
             </button>
@@ -291,7 +291,7 @@ export default function FloatingAppointmentModal({
               type="submit"
               data-testid="floating-submit-btn"
               disabled={submitting}
-              className="btn-invert flex-1 border border-black bg-sky-400 text-black py-3 font-mono-label text-[10px] hover:bg-black hover:text-white disabled:opacity-50"
+              className="btn-invert flex-1 border-2 border-black bg-sky-400 text-black py-3 font-mono-label text-[10px] font-bold hover:bg-black hover:text-white disabled:opacity-50"
             >
               {submitting ? "REGISTRANDO..." : "AGENDAR FLOTANTE"}
             </button>
