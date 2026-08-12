@@ -6,8 +6,7 @@ import { LogOut, Clock, ChevronLeft, ChevronRight, CalendarDays, CalendarRange }
 import { toast } from "sonner";
 import { SLOTS, minToTime, buildOverlapGrid } from "../lib/scheduling";
 
-// SLOTS / minToTime imported from ../lib/scheduling
-const DAYS_ES = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
+const DAYS_ES = ["LUN", "MAR", "MIÉ", "JUE", "VIE", "SÁB", "DOM"];
 
 function timeToMin(t) {
   const [h, m] = t.split(":").map(Number);
@@ -24,9 +23,9 @@ function startOfWeek(d) {
 }
 
 const STATUS_STYLES = {
-  Confirmada: "bg-white border-black text-black",
-  "En curso": "bg-black border-black text-white",
-  Finalizada: "bg-neutral-100 border-neutral-300 text-neutral-500 line-through",
+  Confirmada: "bg-white border-2 border-black text-black",
+  "En curso": "bg-black border-2 border-black text-white",
+  Finalizada: "bg-neutral-200 border-2 border-neutral-500 text-neutral-700 line-through",
 };
 
 export default function MyAgenda() {
@@ -76,7 +75,6 @@ export default function MyAgenda() {
     [weekStart]
   );
 
-  // Per-day overlap grid for week view
   const weekGrid = useMemo(() => {
     const result = {};
     days.forEach((d) => {
@@ -97,63 +95,63 @@ export default function MyAgenda() {
   return (
     <div className="min-h-screen bg-white max-w-full overflow-x-hidden" data-testid="my-agenda-page">
       {/* Top bar */}
-      <header className="border-b border-black px-6 lg:px-12 py-6 flex items-center justify-between gap-6 flex-wrap">
+      <header className="border-b-2 border-black px-6 lg:px-12 py-6 flex items-center justify-between gap-6 flex-wrap">
         <div className="flex items-center gap-4">
           {specialist.avatar_url ? (
-            <img src={specialist.avatar_url} alt="" className="w-14 h-14 object-cover grayscale border border-black" />
+            <img src={specialist.avatar_url} alt="" className="w-14 h-14 object-cover grayscale border-2 border-black" />
           ) : (
-            <div className="w-14 h-14 bg-neutral-200 flex items-center justify-center font-serif-display text-2xl">
+            <div className="w-14 h-14 bg-neutral-200 border-2 border-black flex items-center justify-center font-serif-display text-2xl font-bold text-black">
               {specialist.name.split(" ").map(n => n[0]).slice(0, 2).join("")}
             </div>
           )}
           <div>
-            <div className="font-mono-label text-[10px] text-neutral-500">ESPECIALISTA</div>
-            <div className="font-serif-display text-3xl leading-none mt-1" data-testid="my-name">{specialist.name}</div>
-            <div className="text-xs text-neutral-600 mt-1">{specialist.specialty} · {specialist.start_time}—{specialist.end_time}</div>
+            <div className="font-mono-label text-[10px] font-bold text-black">ESPECIALISTA</div>
+            <div className="font-serif-display text-3xl font-bold leading-none mt-1 text-black" data-testid="my-name">{specialist.name}</div>
+            <div className="text-xs font-semibold text-neutral-800 mt-1">{specialist.specialty} · {specialist.start_time}—{specialist.end_time}</div>
           </div>
         </div>
         <button
           onClick={handleLogout}
           data-testid="my-logout-btn"
-          className="btn-invert border border-black px-4 py-3 font-mono-label text-[10px] hover:bg-black hover:text-white flex items-center gap-2"
+          className="btn-invert border-2 border-black px-4 py-3 font-mono-label text-[10px] font-bold hover:bg-black hover:text-white flex items-center gap-2"
         >
-          <LogOut className="w-3 h-3" strokeWidth={1.5} /> Salir
+          <LogOut className="w-3.5 h-3.5" strokeWidth={2} /> Salir
         </button>
       </header>
 
       {/* View toggle */}
-      <div className="border-b border-black flex">
+      <div className="border-b-2 border-black flex bg-white">
         <button
           data-testid="my-view-day"
           onClick={() => setView("day")}
-          className={`btn-invert px-6 py-4 font-mono-label text-[10px] border-r border-neutral-200 flex items-center gap-2 ${
-            view === "day" ? "bg-black text-white" : "hover:bg-neutral-100"
+          className={`btn-invert px-6 py-4 font-mono-label text-[10px] font-bold border-r border-neutral-300 flex items-center gap-2 ${
+            view === "day" ? "bg-black text-white" : "bg-white text-black hover:bg-neutral-100"
           }`}
         >
-          <CalendarDays className="w-3 h-3" strokeWidth={1.5} /> Hoy
+          <CalendarDays className="w-4 h-4" strokeWidth={2} /> Hoy
         </button>
         <button
           data-testid="my-view-week"
           onClick={() => setView("week")}
-          className={`btn-invert px-6 py-4 font-mono-label text-[10px] border-r border-neutral-200 flex items-center gap-2 ${
-            view === "week" ? "bg-black text-white" : "hover:bg-neutral-100"
+          className={`btn-invert px-6 py-4 font-mono-label text-[10px] font-bold border-r border-neutral-300 flex items-center gap-2 ${
+            view === "week" ? "bg-black text-white" : "bg-white text-black hover:bg-neutral-100"
           }`}
         >
-          <CalendarRange className="w-3 h-3" strokeWidth={1.5} /> Semana
+          <CalendarRange className="w-4 h-4" strokeWidth={2} /> Semana
         </button>
         <div className="flex-1" />
         {view === "week" && (
           <div className="flex items-center gap-1 px-3">
             <button onClick={() => { const d = new Date(weekStart); d.setDate(d.getDate() - 7); setWeekStart(d); }}
               data-testid="my-week-prev"
-              className="btn-invert border border-black h-9 w-9 flex items-center justify-center hover:bg-black hover:text-white">
-              <ChevronLeft className="w-3 h-3" />
+              className="btn-invert border-2 border-black h-9 w-9 flex items-center justify-center hover:bg-black hover:text-white">
+              <ChevronLeft className="w-4 h-4" strokeWidth={2} />
             </button>
-            <span className="font-mono-label text-[10px] px-3" data-testid="my-week-range">{fmtRange()}</span>
+            <span className="font-serif-display text-base font-bold text-black px-3" data-testid="my-week-range">{fmtRange()}</span>
             <button onClick={() => { const d = new Date(weekStart); d.setDate(d.getDate() + 7); setWeekStart(d); }}
               data-testid="my-week-next"
-              className="btn-invert border border-black h-9 w-9 flex items-center justify-center hover:bg-black hover:text-white">
-              <ChevronRight className="w-3 h-3" />
+              className="btn-invert border-2 border-black h-9 w-9 flex items-center justify-center hover:bg-black hover:text-white">
+              <ChevronRight className="w-4 h-4" strokeWidth={2} />
             </button>
           </div>
         )}
@@ -162,86 +160,84 @@ export default function MyAgenda() {
       {/* Content */}
       <div className="p-6 lg:p-12">
         {loading ? (
-          <div className="text-center py-20 font-mono-label text-xs text-neutral-500">Cargando...</div>
+          <div className="text-center py-20 font-mono-label text-xs font-bold text-black">Cargando...</div>
         ) : view === "day" ? (
           appointments.length === 0 ? (
-            <div className="border border-black p-12 text-center" data-testid="my-empty-day">
-              <div className="font-serif-display text-3xl mb-2">Sin citas asignadas hoy</div>
-              <p className="text-sm text-neutral-600">Disfrute su día.</p>
+            <div className="border-2 border-black p-12 text-center" data-testid="my-empty-day">
+              <div className="font-serif-display text-3xl font-bold mb-2 text-black">Sin citas asignadas hoy</div>
+              <p className="text-sm font-medium text-neutral-700">Disfrute su día.</p>
             </div>
           ) : (
             <div data-testid="my-day-timeline">
-              <div className="font-mono-label text-[10px] text-neutral-500 mb-4">
+              <div className="font-mono-label text-[10px] font-bold text-black mb-4">
                 {appointments.length} CITA{appointments.length !== 1 ? "S" : ""} HOY
               </div>
               {(() => {
                 const dayGrid = buildOverlapGrid(appointments);
-                const ROW_H = 96; // px per 30-min slot
+                const ROW_H = 96;
                 return SLOTS.map((slotMin) => {
-                  const hh = Math.floor(slotMin / 60);
-                  const mm = slotMin % 60;
+                  const timeLabel = minToTime(slotMin);
                   const cluster = dayGrid.startsAt.get(slotMin);
                   return (
                     <div
                       key={slotMin}
                       style={{ height: ROW_H }}
-                      className="relative grid grid-cols-[80px_1fr] gap-6 border-t border-neutral-200 first:border-t-0"
-                      data-testid={`my-day-row-${minToTime(slotMin)}`}
+                      className="relative grid grid-cols-[90px_1fr] gap-6 border-t border-neutral-300 first:border-t-0"
+                      data-testid={`my-day-row-${timeLabel}`}
                     >
-                      <div className="font-serif-display text-3xl text-neutral-400 leading-none pt-3">
-                        {String(hh).padStart(2, "0")}<span className="text-base align-top">:{String(mm).padStart(2, "0")}</span>
+                      <div className="font-serif-display text-2xl font-bold text-black leading-none pt-3">
+                        {timeLabel}
                       </div>
-                      <div className="relative">
+                      <div className="relative h-full">
                         {cluster && cluster.appts.length > 0 && (
                           <div
                             style={{
                               position: "absolute",
-                              top: 6,
+                              top: 4,
                               left: 0,
                               right: 0,
-                              height: cluster.span * ROW_H - 12,
+                              height: cluster.span * ROW_H - 8,
                             }}
-                            className="flex flex-col gap-2 z-10"
+                            className="flex flex-col gap-2 z-10 h-full"
                           >
                             {cluster.appts.map((a) => {
                               const sv = findService(a.service_id);
                               const serviceLabel = a.is_floating
                                 ? a.custom_service_name
                                 : (sv?.name || "—");
-                              
-                              const isShortSlot = cluster.span === 1;
+                              const styles = a.is_floating
+                                ? "bg-sky-50 border-2 border-sky-800 text-black border-dashed"
+                                : a.is_overbooked
+                                ? "bg-amber-50 border-2 border-black text-black border-dashed"
+                                : STATUS_STYLES[a.status];
 
                               return (
                                 <div
                                   key={a.id}
                                   data-testid={`my-appt-${a.id}`}
-                                  className={`border ${STATUS_STYLES[a.status]} ${
-                                    isShortSlot ? "px-3 py-2" : "p-4"
-                                  } flex-1 min-h-0 overflow-hidden flex flex-col justify-between`}
+                                  className={`${styles} p-4 flex-1 h-full min-h-0 overflow-hidden flex flex-col justify-between`}
                                 >
-                                  <div className="min-h-0 flex-1 flex flex-col justify-center">
-                                    <div className="flex items-center gap-2 mb-0.5 flex-wrap">
-                                      <Clock className="w-3 h-3 shrink-0" strokeWidth={1.5} />
-                                      <span className="font-mono-label text-[9px] opacity-80">
-                                        {a.start_time} — {a.end_time} · {a.status}
-                                      </span>
+                                  <div>
+                                    <div className="flex items-center justify-between gap-2 mb-1 flex-wrap">
+                                      <div className="flex items-center gap-1.5 font-mono-label text-[9px] font-bold">
+                                        <Clock className="w-3.5 h-3.5" strokeWidth={2} />
+                                        <span>{a.start_time} — {a.end_time} · {a.status}</span>
+                                      </div>
                                       {a.is_floating && (
-                                        <span className="font-mono-label text-[7px] bg-sky-400 text-black px-1 py-0.2 border border-black">
+                                        <span className="font-mono-label text-[8px] font-bold bg-sky-400 text-black px-1.5 py-0.5 border border-black">
                                           FLOTANTE
                                         </span>
                                       )}
                                       {a.is_overbooked && !a.is_floating && (
-                                        <span className="font-mono-label text-[7px] bg-amber-400 text-black px-1 py-0.2 border border-black">
+                                        <span className="font-mono-label text-[8px] font-bold bg-amber-400 text-black px-1.5 py-0.5 border border-black">
                                           EXTRA
                                         </span>
                                       )}
                                     </div>
-                                    <div className={`font-serif-display leading-none truncate ${
-                                      isShortSlot ? "text-lg lg:text-xl my-0.5" : "text-2xl lg:text-3xl my-1"
-                                    }`}>
+                                    <div className="font-serif-display text-2xl lg:text-3xl font-bold leading-tight truncate text-black my-1">
                                       {a.client_name}
                                     </div>
-                                    <div className="font-mono-label text-[9px] lg:text-[10px] uppercase opacity-70 truncate">
+                                    <div className="font-mono-label text-[10px] font-bold text-neutral-800 uppercase truncate">
                                       {serviceLabel}
                                     </div>
                                   </div>
@@ -251,7 +247,7 @@ export default function MyAgenda() {
                           </div>
                         )}
                         {!cluster && !dayGrid.coveredSlots.has(slotMin) && (
-                          <div className="h-full border-l border-dashed border-neutral-200" aria-hidden />
+                          <div className="h-full border-l border-dashed border-neutral-300" aria-hidden />
                         )}
                       </div>
                     </div>
@@ -261,19 +257,19 @@ export default function MyAgenda() {
             </div>
           )
         ) : (
-          <div className="overflow-x-auto border border-black relative">
-            <table className="w-full border-separate border-spacing-0 text-xs table-fixed min-w-[700px]" data-testid="my-week-grid">
+          <div className="border-2 border-black overflow-auto max-h-[calc(100vh-260px)]" data-testid="my-week-grid-wrapper">
+            <table className="w-full border-collapse" data-testid="my-week-grid">
               <thead>
                 <tr>
-                  <th className="sticky left-0 z-50 bg-white border-b border-r border-neutral-200 p-2 w-16 font-mono-label text-[9px] text-neutral-500 shadow-[4px_0_8px_rgba(0,0,0,0.08)]">
+                  <th className="sticky top-0 left-0 z-30 bg-white border-b border-r border-black p-3 text-left font-mono-label text-[10px] font-bold text-black min-w-[90px]">
                     HORA
                   </th>
                   {days.map((d, i) => {
                     const isToday = d.toDateString() === new Date().toDateString();
                     return (
-                      <th key={i} className={`border-b border-r border-neutral-300 last:border-r-0 p-3 text-left min-w-[100px] relative z-0 ${isToday ? "bg-black text-white" : "bg-white"}`}>
-                        <div className="font-mono-label text-[9px] opacity-70">{DAYS_ES[i]}</div>
-                        <div className="font-serif-display text-2xl leading-none mt-1">{d.getDate()}</div>
+                      <th key={i} className={`sticky top-0 z-20 border-b border-r border-black p-3 text-left min-w-[140px] ${isToday ? "bg-black text-white" : "bg-white text-black"}`}>
+                        <div className="font-mono-label text-[10px] font-bold opacity-80">{DAYS_ES[i]}</div>
+                        <div className="font-serif-display text-2xl font-bold leading-none mt-1">{d.getDate()}</div>
                       </th>
                     );
                   })}
@@ -283,8 +279,8 @@ export default function MyAgenda() {
                 {SLOTS.map((slotMin) => {
                   const timeLabel = minToTime(slotMin);
                   return (
-                  <tr key={slotMin}>
-                    <td className="sticky left-0 z-40 bg-white border-b border-r border-neutral-200 p-2 align-top font-mono-label text-[9px] text-neutral-500 shadow-[4px_0_8px_rgba(0,0,0,0.08)]">
+                  <tr key={slotMin} className="align-top">
+                    <td className="sticky left-0 z-10 bg-white border-b border-r border-neutral-300 p-3 font-serif-display text-2xl font-bold text-black leading-none whitespace-nowrap align-middle">
                       {timeLabel}
                     </td>
                     {days.map((d, i) => {
@@ -292,7 +288,7 @@ export default function MyAgenda() {
                       const bucket = weekGrid[ds];
                       if (!bucket) {
                         return (
-                          <td key={i} className="border-b border-r border-neutral-200 last:border-r-0 p-1 align-top h-[30px] relative z-0" />
+                          <td key={i} className="border-b border-r border-neutral-300 p-2 h-10" />
                         );
                       }
                       if (bucket.coveredSlots.has(slotMin)) return null;
@@ -300,66 +296,78 @@ export default function MyAgenda() {
                       const apptList = cluster ? cluster.appts : [];
                       const maxSpan = cluster ? cluster.span : 0;
                       const groupCount = apptList.length;
+
+                      if (groupCount > 0) {
+                        return (
+                          <td
+                            key={i}
+                            rowSpan={maxSpan || 1}
+                            data-testid={`my-week-cell-${ds}-${timeLabel}`}
+                            className="border-b border-r border-neutral-300 p-2 relative align-top h-full"
+                          >
+                            {groupCount > 1 && (
+                              <span
+                                data-testid={`my-week-cell-count-${ds}-${timeLabel}`}
+                                className="absolute top-1 right-1 z-10 font-mono-label text-[8px] font-bold bg-black text-white px-1.5 py-0.5 border border-black"
+                              >
+                                ×{groupCount}
+                              </span>
+                            )}
+                            <div className="flex flex-col gap-1.5 h-full">
+                              {apptList.map((a) => {
+                                const sv = findService(a.service_id);
+                                const serviceLabel = a.is_floating
+                                  ? a.custom_service_name
+                                  : (sv?.name || "—");
+                                const cls = a.is_floating
+                                  ? "bg-sky-50 border-2 border-sky-800 text-black border-dashed"
+                                  : a.is_overbooked
+                                  ? "bg-amber-50 border-2 border-black text-black border-dashed"
+                                  : STATUS_STYLES[a.status];
+
+                                return (
+                                  <div
+                                    key={a.id}
+                                    data-testid={`my-week-appt-${a.id}`}
+                                    className={`${cls} p-2.5 flex-1 h-full flex flex-col justify-between transition-colors min-h-0`}
+                                  >
+                                    <div>
+                                      <div className="flex items-center justify-between gap-1">
+                                        <span className="font-mono-label text-[9px] font-bold">
+                                          {a.start_time}–{a.end_time}
+                                        </span>
+                                        {a.is_floating && (
+                                          <span className="font-mono-label text-[7px] font-bold bg-sky-400 text-black px-1 border border-black">
+                                            FLOT
+                                          </span>
+                                        )}
+                                        {a.is_overbooked && !a.is_floating && (
+                                          <span className="font-mono-label text-[7px] font-bold bg-amber-400 text-black px-1 border border-black">
+                                            EXTRA
+                                          </span>
+                                        )}
+                                      </div>
+                                      <div className="font-serif-display text-base font-bold leading-tight break-words mt-1">
+                                        {a.client_name}
+                                      </div>
+                                      <div className="text-[10px] font-semibold opacity-90 leading-tight uppercase mt-0.5">
+                                        {serviceLabel}
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </td>
+                        );
+                      }
+
                       return (
                         <td
                           key={i}
-                          rowSpan={maxSpan || 1}
                           data-testid={`my-week-cell-${ds}-${timeLabel}`}
-                          className="border-b border-r border-neutral-200 last:border-r-0 p-1 align-top h-[30px] relative z-0"
-                        >
-                          {groupCount > 1 && (
-                            <span
-                              data-testid={`my-week-cell-count-${ds}-${timeLabel}`}
-                              className="absolute top-0.5 right-0.5 z-10 font-mono-label text-[7px] bg-black text-white px-1 border border-black"
-                            >
-                              ×{groupCount}
-                            </span>
-                          )}
-                          <div className="flex flex-col gap-1 h-full relative z-0">
-                            {apptList.map((a) => {
-                              const sv = findService(a.service_id);
-                              const cls = a.is_floating
-                                ? "bg-sky-50 border border-sky-700 border-dashed text-black"
-                                : a.is_overbooked
-                                ? "bg-amber-50 border border-black border-dashed text-black"
-                                : a.status === "En curso"
-                                ? "bg-black text-white"
-                                : a.status === "Finalizada"
-                                ? "bg-neutral-100 text-neutral-400 line-through"
-                                : "bg-white border border-black";
-                              const serviceLabel = a.is_floating
-                                ? a.custom_service_name
-                                : (sv?.name || "—");
-                              return (
-                                <div
-                                  key={a.id}
-                                  data-testid={`my-week-appt-${a.id}`}
-                                  className={`${cls} p-2 text-[10px] leading-tight flex-1 flex flex-col gap-0.5 min-h-0 overflow-hidden relative z-0`}
-                                >
-                                  <div className="flex items-center justify-between gap-1">
-                                    <span className="font-mono-label text-[8px] opacity-70">
-                                      {a.start_time}—{a.end_time}
-                                    </span>
-                                    {a.is_floating && (
-                                      <span className="font-mono-label text-[7px] bg-sky-400 text-black px-1 border border-black shrink-0">
-                                        FLOT
-                                      </span>
-                                    )}
-                                    {a.is_overbooked && !a.is_floating && (
-                                      <span className="font-mono-label text-[7px] bg-amber-400 text-black px-1 border border-black shrink-0">
-                                        EXTRA
-                                      </span>
-                                    )}
-                                  </div>
-                                  <div className="font-medium leading-tight break-words">{a.client_name}</div>
-                                  <div className="opacity-80 font-serif-display leading-tight break-words mt-0.5">
-                                    {serviceLabel}
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </td>
+                          className="border-b border-r border-neutral-300 p-2 h-10"
+                        />
                       );
                     })}
                   </tr>
