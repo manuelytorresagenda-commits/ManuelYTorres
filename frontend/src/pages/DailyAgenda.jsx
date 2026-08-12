@@ -270,7 +270,6 @@ export default function DailyAgenda() {
                   const timeLabel = minToTime(slotMin);
                   return (
                   <tr key={slotMin} data-testid={`row-slot-${timeLabel}`}>
-                    {/* Celda de Hora Uniforme y Elegante */}
                     <td
                       className="sticky left-0 z-10 bg-white border-r border-b border-neutral-300 p-3 font-serif-display text-2xl font-bold text-black leading-none whitespace-nowrap align-middle"
                     >
@@ -291,7 +290,7 @@ export default function DailyAgenda() {
                             key={sp.id}
                             rowSpan={maxSpan}
                             data-testid={`cell-${sp.id}-${timeLabel}`}
-                            className="border-r border-b border-neutral-300 p-2 relative align-stretch h-full"
+                            className="border-r border-b border-neutral-300 p-1.5 relative h-1 align-stretch"
                           >
                             {groupCount > 1 && (
                               <span
@@ -302,7 +301,7 @@ export default function DailyAgenda() {
                                 ×{groupCount}
                               </span>
                             )}
-                            <div className="flex flex-col gap-2 min-h-full h-full">
+                            <div className="flex flex-col gap-1.5 h-full w-full">
                               {cluster.appts.map((a) => {
                                 const sv = findService(a.service_id);
                                 const styles = a.is_floating
@@ -318,7 +317,7 @@ export default function DailyAgenda() {
                                     key={a.id}
                                     data-testid={`appointment-card-${a.id}`}
                                     onClick={() => setDetailAppt(a)}
-                                    className={`group border-2 ${styles} p-3 flex-1 min-h-full h-full flex flex-col justify-between transition-colors cursor-pointer`}
+                                    className={`group border-2 ${styles} p-3 flex-1 h-full w-full flex flex-col justify-between transition-colors cursor-pointer box-border`}
                                   >
                                     <div>
                                       <div className="flex items-center justify-between gap-2">
