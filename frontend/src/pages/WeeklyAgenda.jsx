@@ -195,7 +195,6 @@ export default function WeeklyAgenda() {
                   const timeLabel = minToTime(slotMin);
                   return (
                   <tr key={slotMin} className="align-top">
-                    {/* Celda de Hora Elegante y Legible */}
                     <td className="sticky left-0 z-10 bg-white border-b border-r border-neutral-300 p-3 font-serif-display text-2xl font-bold text-black leading-none whitespace-nowrap align-middle">
                       {timeLabel}
                     </td>
@@ -218,7 +217,7 @@ export default function WeeklyAgenda() {
                           <td
                             key={i}
                             rowSpan={maxSpan || 1}
-                            className="border-b border-r border-neutral-300 p-2 relative align-top"
+                            className="border-b border-r border-neutral-300 p-2 relative align-top h-full"
                             data-testid={`week-cell-${ds}-${timeLabel}`}
                           >
                             {groupCount > 1 && (
@@ -250,31 +249,33 @@ export default function WeeklyAgenda() {
                                     key={a.id}
                                     data-testid={`week-appt-${a.id}`}
                                     onClick={() => setDetailAppt(a)}
-                                    className={`${cls} p-2 flex-1 flex flex-col gap-1 transition-colors cursor-pointer min-h-0`}
+                                    className={`${cls} p-2.5 flex-1 h-full flex flex-col justify-between transition-colors cursor-pointer min-h-0`}
                                   >
-                                    <div className="flex items-center justify-between gap-1">
-                                      <span className="font-mono-label text-[9px] font-bold">
-                                        {a.start_time}–{a.end_time}
-                                      </span>
-                                      {a.is_floating && (
-                                        <span className="font-mono-label text-[7px] font-bold bg-sky-400 text-black px-1 border border-black">
-                                          FLOT
+                                    <div>
+                                      <div className="flex items-center justify-between gap-1">
+                                        <span className="font-mono-label text-[9px] font-bold">
+                                          {a.start_time}–{a.end_time}
                                         </span>
-                                      )}
-                                      {a.is_overbooked && !a.is_floating && (
-                                        <span className="font-mono-label text-[7px] font-bold bg-amber-400 text-black px-1 border border-black">
-                                          EXTRA
-                                        </span>
-                                      )}
-                                    </div>
-                                    <div className="font-serif-display text-base font-bold leading-tight break-words">
-                                      {a.client_name}
-                                    </div>
-                                    <div className="text-[10px] font-semibold opacity-90 leading-tight uppercase">
-                                      {serviceLabel}
+                                        {a.is_floating && (
+                                          <span className="font-mono-label text-[7px] font-bold bg-sky-400 text-black px-1 border border-black">
+                                            FLOT
+                                          </span>
+                                        )}
+                                        {a.is_overbooked && !a.is_floating && (
+                                          <span className="font-mono-label text-[7px] font-bold bg-amber-400 text-black px-1 border border-black">
+                                            EXTRA
+                                          </span>
+                                        )}
+                                      </div>
+                                      <div className="font-serif-display text-base font-bold leading-tight break-words mt-1">
+                                        {a.client_name}
+                                      </div>
+                                      <div className="text-[10px] font-semibold opacity-90 leading-tight uppercase mt-0.5">
+                                        {serviceLabel}
+                                      </div>
                                     </div>
                                     {sp && (
-                                      <div className="font-mono-label text-[8px] font-bold opacity-90 uppercase mt-auto">
+                                      <div className="font-mono-label text-[8px] font-bold opacity-90 uppercase mt-auto pt-1">
                                         {sp.name}
                                       </div>
                                     )}
