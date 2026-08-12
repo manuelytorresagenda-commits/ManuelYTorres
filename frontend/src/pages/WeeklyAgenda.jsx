@@ -194,7 +194,7 @@ export default function WeeklyAgenda() {
                 {SLOTS.map((slotMin) => {
                   const timeLabel = minToTime(slotMin);
                   return (
-                  <tr key={slotMin} className="align-top">
+                  <tr key={slotMin}>
                     <td className="sticky left-0 z-10 bg-white border-b border-r border-neutral-300 p-3 font-serif-display text-2xl font-bold text-black leading-none whitespace-nowrap align-middle">
                       {timeLabel}
                     </td>
@@ -217,7 +217,7 @@ export default function WeeklyAgenda() {
                           <td
                             key={i}
                             rowSpan={maxSpan || 1}
-                            className="border-b border-r border-neutral-300 p-2 relative align-top h-full"
+                            className="border-b border-r border-neutral-300 p-1.5 relative h-1 align-stretch"
                             data-testid={`week-cell-${ds}-${timeLabel}`}
                           >
                             {groupCount > 1 && (
@@ -228,7 +228,7 @@ export default function WeeklyAgenda() {
                                 ×{groupCount}
                               </span>
                             )}
-                            <div className="flex flex-col gap-1.5 h-full">
+                            <div className="flex flex-col gap-1.5 h-full w-full">
                               {apptList.map((a) => {
                                 const sv = findSv(a.service_id);
                                 const sp = findSp(a.specialist_id);
@@ -249,7 +249,7 @@ export default function WeeklyAgenda() {
                                     key={a.id}
                                     data-testid={`week-appt-${a.id}`}
                                     onClick={() => setDetailAppt(a)}
-                                    className={`${cls} p-2.5 flex-1 h-full flex flex-col justify-between transition-colors cursor-pointer min-h-0`}
+                                    className={`${cls} p-2.5 flex-1 h-full w-full flex flex-col justify-between transition-colors cursor-pointer box-border`}
                                   >
                                     <div>
                                       <div className="flex items-center justify-between gap-1">
