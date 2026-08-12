@@ -269,8 +269,8 @@ export default function DailyAgenda() {
                 {SLOTS.map((slotMin) => {
                   const timeLabel = minToTime(slotMin);
                   return (
-                  <tr key={slotMin} data-testid={`row-slot-${timeLabel}`} className="align-top">
-                    {/* Celda de Hora Uniforme y Elegante (Serif Grande y Oscura) */}
+                  <tr key={slotMin} data-testid={`row-slot-${timeLabel}`}>
+                    {/* Celda de Hora Uniforme y Elegante */}
                     <td
                       className="sticky left-0 z-10 bg-white border-r border-b border-neutral-300 p-3 font-serif-display text-2xl font-bold text-black leading-none whitespace-nowrap align-middle"
                     >
@@ -291,7 +291,7 @@ export default function DailyAgenda() {
                             key={sp.id}
                             rowSpan={maxSpan}
                             data-testid={`cell-${sp.id}-${timeLabel}`}
-                            className="border-r border-b border-neutral-300 p-2 relative"
+                            className="border-r border-b border-neutral-300 p-2 relative align-stretch h-full"
                           >
                             {groupCount > 1 && (
                               <span
@@ -302,7 +302,7 @@ export default function DailyAgenda() {
                                 ×{groupCount}
                               </span>
                             )}
-                            <div className="flex flex-col gap-2 h-full">
+                            <div className="flex flex-col gap-2 min-h-full h-full">
                               {cluster.appts.map((a) => {
                                 const sv = findService(a.service_id);
                                 const styles = a.is_floating
@@ -318,52 +318,54 @@ export default function DailyAgenda() {
                                     key={a.id}
                                     data-testid={`appointment-card-${a.id}`}
                                     onClick={() => setDetailAppt(a)}
-                                    className={`group border-2 ${styles} p-3 flex-1 flex flex-col gap-2 transition-colors cursor-pointer min-h-0`}
+                                    className={`group border-2 ${styles} p-3 flex-1 min-h-full h-full flex flex-col justify-between transition-colors cursor-pointer`}
                                   >
-                                    <div className="flex items-center justify-between gap-2">
-                                      <span className="font-mono-label text-[9px] font-bold text-black">
-                                        {a.start_time} — {a.end_time}
-                                      </span>
-                                      <div className="flex items-center gap-1">
-                                        {a.is_floating && (
-                                          <span
-                                            data-testid={`floating-badge-${a.id}`}
-                                            className="font-mono-label text-[8px] font-bold bg-sky-400 text-black px-1.5 py-0.5 border border-black"
-                                          >
-                                            FLOTANTE
-                                          </span>
-                                        )}
-                                        {a.is_overbooked && !a.is_floating && (
-                                          <span
-                                            data-testid={`extra-badge-${a.id}`}
-                                            className="font-mono-label text-[8px] font-bold bg-amber-400 text-black px-1.5 py-0.5 border border-black"
-                                          >
-                                            EXTRA
-                                          </span>
-                                        )}
-                                        <span className="font-mono-label text-[9px] font-bold opacity-90">
-                                          {a.status}
+                                    <div>
+                                      <div className="flex items-center justify-between gap-2">
+                                        <span className="font-mono-label text-[9px] font-bold text-black">
+                                          {a.start_time} — {a.end_time}
                                         </span>
+                                        <div className="flex items-center gap-1">
+                                          {a.is_floating && (
+                                            <span
+                                              data-testid={`floating-badge-${a.id}`}
+                                              className="font-mono-label text-[8px] font-bold bg-sky-400 text-black px-1.5 py-0.5 border border-black"
+                                            >
+                                              FLOTANTE
+                                            </span>
+                                          )}
+                                          {a.is_overbooked && !a.is_floating && (
+                                            <span
+                                              data-testid={`extra-badge-${a.id}`}
+                                              className="font-mono-label text-[8px] font-bold bg-amber-400 text-black px-1.5 py-0.5 border border-black"
+                                            >
+                                              EXTRA
+                                            </span>
+                                          )}
+                                          <span className="font-mono-label text-[9px] font-bold opacity-90">
+                                            {a.status}
+                                          </span>
+                                        </div>
                                       </div>
+                                      <div className="font-serif-display text-lg font-bold leading-tight break-words text-black mt-1">
+                                        {a.client_name}
+                                      </div>
+                                      <div className="text-xs font-semibold opacity-90 leading-snug mt-0.5">
+                                        {serviceLabel}
+                                      </div>
+                                      {Array.isArray(a.additional_services) && a.additional_services.length > 0 && (
+                                        <ul
+                                          data-testid={`extras-list-${a.id}`}
+                                          className="text-[11px] font-medium opacity-90 list-disc list-inside space-y-0.5 leading-tight pl-1 mt-1"
+                                        >
+                                          {a.additional_services.map((ex, i) => (
+                                            <li key={ex.id || `${ex.name}-${i}`} className="break-words">
+                                              {ex.name}
+                                            </li>
+                                          ))}
+                                        </ul>
+                                      )}
                                     </div>
-                                    <div className="font-serif-display text-lg font-bold leading-tight break-words text-black">
-                                      {a.client_name}
-                                    </div>
-                                    <div className="text-xs font-semibold opacity-90 leading-snug">
-                                      {serviceLabel}
-                                    </div>
-                                    {Array.isArray(a.additional_services) && a.additional_services.length > 0 && (
-                                      <ul
-                                        data-testid={`extras-list-${a.id}`}
-                                        className="text-[11px] font-medium opacity-90 list-disc list-inside space-y-0.5 leading-tight pl-1"
-                                      >
-                                        {a.additional_services.map((ex, i) => (
-                                          <li key={ex.id || `${ex.name}-${i}`} className="break-words">
-                                            {ex.name}
-                                          </li>
-                                        ))}
-                                      </ul>
-                                    )}
                                     <div
                                       className="flex flex-wrap gap-1 mt-auto pt-2"
                                       onClick={(e) => e.stopPropagation()}
