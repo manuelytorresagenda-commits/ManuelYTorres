@@ -8,7 +8,7 @@ import {
 } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, X, MapPin, KeyRound } from "lucide-react";
+import { Plus, Pencil, Trash2, X, MapPin, KeyRound, UserCheck } from "lucide-react";
 import ChangeBranchPinDialog from "../components/ChangeBranchPinDialog";
 import PinPromptDialog from "../components/PinPromptDialog";
 
@@ -141,6 +141,62 @@ function SpecialistForm({ initial, onSubmit, onCancel, branches, defaultBranchId
   );
 }
 
+function ReceptionistForm({ initial, onSubmit, onCancel, branches, defaultBranchId }) {
+  const [form, setForm] = useState(initial || {
+    name: "", start_time: "09:00", end_time: "18:00",
+    avatar_url: "", branch_id: defaultBranchId || "",
+  });
+  const upd = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+  return (
+    <form onSubmit={(e) => { e.preventDefault(); onSubmit(form); }} className="space-y-4">
+      <div>
+        <label className="font-mono-label text-[9px] font-bold text-black block mb-2">NOMBRE COMPLETO</label>
+        <input required type="text" value={form.name}
+          onChange={(e) => upd("name", e.target.value)}
+          placeholder="Ej: Sofia López"
+          className="w-full border-2 border-black px-4 py-3 outline-none font-serif-display text-lg font-bold text-black" />
+      </div>
+      <div>
+        <label className="font-mono-label text-[9px] font-bold text-black block mb-2">SUCURSAL</label>
+        <select required value={form.branch_id || ""}
+          onChange={(e) => upd("branch_id", e.target.value)}
+          className="w-full border-2 border-black px-4 py-3 outline-none text-sm font-medium text-black bg-white">
+          <option value="">— Seleccione sucursal —</option>
+          {branches.map((b) => (
+            <option key={b.id} value={b.id}>{b.name}</option>
+          ))}
+        </select>
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="font-mono-label text-[9px] font-bold text-black block mb-2">HORARIO ENTRADA</label>
+          <input required type="time" value={form.start_time}
+            onChange={(e) => upd("start_time", e.target.value)}
+            className="w-full border-2 border-black px-4 py-3 outline-none font-mono-label text-xs font-bold text-black" />
+        </div>
+        <div>
+          <label className="font-mono-label text-[9px] font-bold text-black block mb-2">HORARIO SALIDA</label>
+          <input required type="time" value={form.end_time}
+            onChange={(e) => upd("end_time", e.target.value)}
+            className="w-full border-2 border-black px-4 py-3 outline-none font-mono-label text-xs font-bold text-black" />
+        </div>
+      </div>
+      <div>
+        <label className="font-mono-label text-[9px] font-bold text-black block mb-2">URL AVATAR (OPCIONAL)</label>
+        <input type="url" value={form.avatar_url || ""}
+          onChange={(e) => upd("avatar_url", e.target.value)}
+          className="w-full border-2 border-black px-4 py-3 outline-none text-xs font-medium text-black" />
+      </div>
+      <div className="flex gap-2 pt-2">
+        <button type="button" onClick={onCancel}
+          className="btn-invert flex-1 border-2 border-black py-3 font-mono-label text-[10px] font-bold hover:bg-black hover:text-white">CANCELAR</button>
+        <button type="submit"
+          className="btn-invert flex-1 border-2 border-black bg-black text-white py-3 font-mono-label text-[10px] font-bold hover:bg-white hover:text-black">GUARDAR</button>
+      </div>
+    </form>
+  );
+}
+
 function BranchForm({ initial, onSubmit, onCancel }) {
   const [form, setForm] = useState(initial || { name: "", address: "" });
   const upd = (k, v) => setForm((f) => ({ ...f, [k]: v }));
@@ -174,6 +230,7 @@ export default function Catalog() {
   const [tab, setTab] = useState("services");
   const [services, setServices] = useState([]);
   const [specialists, setSpecialists] = useState([]);
+  const [receptionists, setReceptionists] = useState([]);
   const [branches, setBranches] = useState([]);
   const [pinDialogBranch, setPinDialogBranch] = useState(null);
   const [deletePinBranch, setDeletePinBranch] = useState(null);
@@ -189,6 +246,10 @@ export default function Catalog() {
         fetchBranches(),
       ]);
       setServices(sv); setSpecialists(sp); setBranches(br);
+
+      // Cargar recepcionistas desde localStorage (fallback local seguro)
+      const storedRecs = JSON.parse(localStorage.getItem("myt_receptionists") || "[]");
+      setReceptionists(storedRecs);
     } catch { toast.error("Error cargando datos"); }
   };
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [branch]);
@@ -221,6 +282,22 @@ export default function Catalog() {
     } catch { toast.error("No se pudo guardar"); }
   };
 
+  const handleReceptionistSubmit = (data) => {
+    try {
+      let updated = [...receptionists];
+      if (editing?.type === "receptionist") {
+        updated = updated.map((r) => r.id === editing.item.id ? { ...r, ...data } : r);
+      } else {
+        const newItem = { id: `rec_${Date.now()}`, ...data };
+        updated.push(newItem);
+      }
+      localStorage.setItem("myt_receptionists", JSON.stringify(updated));
+      setReceptionists(updated);
+      toast.success("Recepcionista guardada");
+      setEditing(null); setCreating(null);
+    } catch { toast.error("No se pudo guardar"); }
+  };
+
   const handleBranchSubmit = async (data) => {
     try {
       if (editing?.type === "branch") await updateBranch(editing.item.id, data);
@@ -242,6 +319,14 @@ export default function Catalog() {
     catch { toast.error("Error al eliminar"); }
   };
 
+  const removeReceptionist = (id) => {
+    if (!window.confirm("¿Eliminar esta recepcionista?")) return;
+    const updated = receptionists.filter((r) => r.id !== id);
+    localStorage.setItem("myt_receptionists", JSON.stringify(updated));
+    setReceptionists(updated);
+    toast.success("Eliminada");
+  };
+
   const removeBranch = async (id) => {
     try { await deleteBranch(id); toast.success("Sucursal eliminada"); load(); }
     catch (e) { toast.error(e.response?.data?.detail || "Error al eliminar"); }
@@ -259,12 +344,16 @@ export default function Catalog() {
     !branch ? true : s.branch_id === branch.id
   );
 
+  const filteredReceptionists = receptionists.filter((r) =>
+    !branch ? true : r.branch_id === branch.id
+  );
+
   const tabBtnClass = (active) =>
     `btn-invert px-6 lg:px-8 py-4 font-mono-label text-[10px] font-bold border-r border-neutral-300 ${
       active ? "bg-black text-white" : "bg-white text-black hover:bg-neutral-100"
     }`;
 
-  const addLabel = tab === "services" ? "Servicio" : tab === "specialists" ? "Especialista" : "Sucursal";
+  const addLabel = tab === "services" ? "Servicio" : tab === "specialists" ? "Especialista" : tab === "receptionists" ? "Recepcionista" : "Sucursal";
 
   return (
     <div data-testid="catalog-page">
@@ -273,7 +362,7 @@ export default function Catalog() {
         title="Catálogo &"
         italic="Equipo"
         description={branch
-          ? `Gestione servicios, equipo y sucursales. Los servicios y especialistas mostrados corresponden a ${branch.name}. Cada sucursal tiene su propio catálogo independiente.`
+          ? `Gestione servicios, equipo y sucursales. Los servicios, especialistas y recepcionistas mostrados corresponden a ${branch.name}. Cada sucursal tiene su propio catálogo independiente.`
           : "Administre los servicios, sucursales y equipo del salón."}
       />
 
@@ -285,13 +374,16 @@ export default function Catalog() {
         <button data-testid="tab-specialists" onClick={() => setTab("specialists")} className={tabBtnClass(tab === "specialists")}>
           Especialistas ({filteredSpecialists.length})
         </button>
+        <button data-testid="tab-receptionists" onClick={() => setTab("receptionists")} className={tabBtnClass(tab === "receptionists")}>
+          Recepcionistas ({filteredReceptionists.length})
+        </button>
         <button data-testid="tab-branches" onClick={() => setTab("branches")} className={tabBtnClass(tab === "branches")}>
           Sucursales ({branches.length})
         </button>
         <div className="flex-1" />
         <button
           data-testid="add-new-btn"
-          onClick={() => setCreating(tab === "services" ? "service" : tab === "specialists" ? "specialist" : "branch")}
+          onClick={() => setCreating(tab === "services" ? "service" : tab === "specialists" ? "specialist" : tab === "receptionists" ? "receptionist" : "branch")}
           className="btn-invert px-6 py-4 bg-black text-white font-mono-label text-[10px] font-bold hover:bg-white hover:text-black hover:border-l-2 hover:border-black flex items-center gap-2 whitespace-nowrap"
         >
           <Plus className="w-3.5 h-3.5" strokeWidth={2} /> Agregar {addLabel}
@@ -373,6 +465,51 @@ export default function Catalog() {
               );
             })}
           </div>
+        ) : tab === "receptionists" ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filteredReceptionists.map((r) => {
+              const br = findBranch(r.branch_id);
+              return (
+                <div key={r.id} className="border-2 border-black overflow-hidden flex flex-col bg-white">
+                  {r.avatar_url ? (
+                    <div className="aspect-[4/3] overflow-hidden bg-neutral-100">
+                      <img src={r.avatar_url} alt={r.name} className="w-full h-full object-cover grayscale" />
+                    </div>
+                  ) : (
+                    <div className="aspect-[4/3] bg-neutral-100 border-b-2 border-black flex items-center justify-center">
+                      <span className="font-serif-display text-6xl font-bold text-black">
+                        {r.name.split(" ").map(n => n[0]).slice(0, 2).join("")}
+                      </span>
+                    </div>
+                  )}
+                  <div className="p-5 flex-1 flex flex-col">
+                    <div className="font-mono-label text-[9px] font-bold text-black flex items-center gap-1">
+                      <UserCheck className="w-3 h-3" strokeWidth={2} /> RECEPCIONISTA
+                    </div>
+                    <h3 className="font-serif-display text-2xl font-bold mt-1 text-black">{r.name}</h3>
+                    {br && (
+                      <div className="font-mono-label text-[9px] font-bold text-black mt-3 flex items-center gap-1">
+                        <MapPin className="w-3 h-3" strokeWidth={2} /> {br.name.replace(/^Manuel & Torres · /, "")}
+                      </div>
+                    )}
+                    <div className="font-mono-label text-[9px] font-bold text-neutral-800 mt-1">
+                      {r.start_time} — {r.end_time}
+                    </div>
+                    <div className="flex gap-2 mt-4">
+                      <button onClick={() => setEditing({ type: "receptionist", item: r })}
+                        className="btn-invert flex-1 border-2 border-black py-2 font-mono-label text-[9px] font-bold text-black hover:bg-black hover:text-white flex items-center justify-center gap-2">
+                        <Pencil className="w-3 h-3" strokeWidth={2} /> EDITAR
+                      </button>
+                      <button onClick={() => removeReceptionist(r.id)}
+                        className="btn-invert border-2 border-black w-10 hover:bg-black hover:text-white flex items-center justify-center">
+                        <Trash2 className="w-3.5 h-3.5" strokeWidth={2} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" data-testid="branches-grid-admin">
             {branches.map((b, i) => {
@@ -431,6 +568,18 @@ export default function Catalog() {
           branches={branches}
           defaultBranchId={branch?.id}
           onSubmit={handleSpecialistSubmit}
+          onCancel={() => { setCreating(null); setEditing(null); }}
+        />
+      </Modal>
+
+      <Modal open={creating === "receptionist" || editing?.type === "receptionist"}
+             onClose={() => { setCreating(null); setEditing(null); }}
+             title={editing ? "Editar recepcionista" : "Nueva recepcionista"}>
+        <ReceptionistForm
+          initial={editing?.item}
+          branches={branches}
+          defaultBranchId={branch?.id}
+          onSubmit={handleReceptionistSubmit}
           onCancel={() => { setCreating(null); setEditing(null); }}
         />
       </Modal>
