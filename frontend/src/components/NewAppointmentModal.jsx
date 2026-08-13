@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "./ui/dialog";
-import { createAppointment, fetchServices, fetchAppointments } from "../lib/api";
+import { createAppointment, fetchServices, fetchAppointments, fetchReceptionists } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import { toast } from "sonner";
-import { X, Instagram, Music2, Cake, MessageCircle, Search } from "lucide-react";
+import { X, Instagram, Music2, Cake, MessageCircle, Search, UserCheck } from "lucide-react";
 import ClientAutocomplete from "./ClientAutocomplete";
 import { openBookingWhatsapp } from "../lib/whatsapp";
 
@@ -24,6 +24,7 @@ export default function NewAppointmentModal({
 }) {
   const { branch } = useAuth();
   const [services, setServices] = useState([]);
+  const [receptionists, setReceptionists] = useState([]);
   const [serviceQuery, setServiceQuery] = useState("");
   const [appointments, setAppointments] = useState([]);
 
@@ -34,6 +35,7 @@ export default function NewAppointmentModal({
   const [clientInstagram, setClientInstagram] = useState("");
   const [clientTiktok, setClientTiktok] = useState("");
   const [clientBirthday, setClientBirthday] = useState("");
+  const [receptionistName, setReceptionistName] = useState("");
   const [date, setDate] = useState(initialDate || new Date().toISOString().slice(0, 10));
   const [startTime, setStartTime] = useState(initialStartTime || "");
   const [isOverbooked, setIsOverbooked] = useState(false);
@@ -51,6 +53,7 @@ export default function NewAppointmentModal({
       setClientInstagram("");
       setClientTiktok("");
       setClientBirthday("");
+      setReceptionistName("");
       setIsOverbooked(false);
       setNotifyWhatsapp(true);
       setServiceQuery("");
@@ -60,6 +63,12 @@ export default function NewAppointmentModal({
   useEffect(() => {
     if (!open || !branch) return;
     fetchServices({ branch_id: branch.id }).then(setServices).catch(() => toast.error("Error cargando servicios"));
+    fetchReceptionists({ branch_id: branch.id }).then((rc) => {
+      setReceptionists(rc);
+      if (rc && rc.length > 0) {
+        setReceptionistName(rc[0].name);
+      }
+    }).catch(() => {});
   }, [open, branch]);
 
   useEffect(() => {
@@ -110,6 +119,7 @@ export default function NewAppointmentModal({
         client_instagram: clientInstagram,
         client_tiktok: clientTiktok,
         client_birthday: clientBirthday,
+        receptionist_name: receptionistName,
         date,
         start_time: startTime,
         is_overbooked: isOverbooked,
@@ -126,6 +136,7 @@ export default function NewAppointmentModal({
           serviceName: sv?.name,
           specialistName: sp?.name,
           branchName: branch?.name,
+          receptionistName,
         });
         if (opened) {
           toast.info("Abriendo WhatsApp para confirmar a la cliente…");
@@ -467,6 +478,24 @@ export default function NewAppointmentModal({
             />
           </label>
 
+          {/* Recepcionista (Hasta abajo) */}
+          <div>
+            <label className="font-mono-label text-[10px] font-bold text-black block mb-2 flex items-center gap-1">
+              <UserCheck className="w-3.5 h-3.5 text-black" strokeWidth={2} /> RECEPCIONISTA (QUIEN ATENDIÓ)
+            </label>
+            <select
+              data-testid="modal-receptionist-select"
+              value={receptionistName}
+              onChange={(e) => setReceptionistName(e.target.value)}
+              className="w-full border-2 border-black px-4 py-3 bg-white outline-none focus:ring-1 focus:ring-black font-mono-label text-xs font-bold text-black"
+            >
+              <option value="">— Seleccionar —</option>
+              {receptionists.map((r) => (
+                <option key={r.id} value={r.name}>{r.name}</option>
+              ))}
+            </select>
+          </div>
+
           {/* Summary */}
           {sv && startTime && (
             <div className="border-2 border-black p-4 bg-neutral-50 text-black" data-testid="modal-summary">
@@ -475,6 +504,9 @@ export default function NewAppointmentModal({
                 {startTime} — {minToTime(timeToMin(startTime) + sv.duration_minutes)}
               </div>
               <div className="text-xs font-semibold text-neutral-800 mt-1">{sv.name} · {sp?.name}</div>
+              {receptionistName && (
+                <div className="text-xs font-semibold text-neutral-800">Atendido por: {receptionistName}</div>
+              )}
             </div>
           )}
 
