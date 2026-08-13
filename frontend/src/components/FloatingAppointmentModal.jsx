@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "./ui/dialog";
-import { createAppointment } from "../lib/api";
+import { createAppointment, fetchReceptionists } from "../lib/api";
+import { useAuth } from "../context/AuthContext";
 import { toast } from "sonner";
-import { X, Wind, Instagram, Music2, Cake } from "lucide-react";
+import { X, Wind, Instagram, Music2, Cake, UserCheck } from "lucide-react";
 import ClientAutocomplete from "./ClientAutocomplete";
 
 const QUICK_DURATIONS = [15, 30, 45, 60, 90];
@@ -13,6 +14,8 @@ export default function FloatingAppointmentModal({
   onCreated,
   specialists = [],
 }) {
+  const { branch } = useAuth();
+  const [receptionists, setReceptionists] = useState([]);
   const [specialistId, setSpecialistId] = useState("");
   const [clientName, setClientName] = useState("");
   const [clientPhone, setClientPhone] = useState("");
@@ -20,6 +23,7 @@ export default function FloatingAppointmentModal({
   const [clientTiktok, setClientTiktok] = useState("");
   const [clientBirthday, setClientBirthday] = useState("");
   const [serviceName, setServiceName] = useState("");
+  const [receptionistName, setReceptionistName] = useState("");
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [startTime, setStartTime] = useState("");
   const [duration, setDuration] = useState(30);
@@ -34,11 +38,24 @@ export default function FloatingAppointmentModal({
       setClientTiktok("");
       setClientBirthday("");
       setServiceName("");
+      setReceptionistName("");
       setDate(new Date().toISOString().slice(0, 10));
       setStartTime("");
       setDuration(30);
     }
   }, [open]);
+
+  useEffect(() => {
+    if (!open || !branch) return;
+    fetchReceptionists({ branch_id: branch.id })
+      .then((rc) => {
+        setReceptionists(rc);
+        if (rc && rc.length > 0) {
+          setReceptionistName(rc[0].name);
+        }
+      })
+      .catch(() => {});
+  }, [open, branch]);
 
   const submit = async (e) => {
     e.preventDefault();
@@ -55,6 +72,7 @@ export default function FloatingAppointmentModal({
         client_instagram: clientInstagram,
         client_tiktok: clientTiktok,
         client_birthday: clientBirthday,
+        receptionist_name: receptionistName,
         date,
         start_time: startTime,
         is_floating: true,
@@ -276,6 +294,26 @@ export default function FloatingAppointmentModal({
               onChange={(e) => setDuration(parseInt(e.target.value) || 0)}
               className="w-full border-2 border-black px-4 py-2 bg-white outline-none focus:ring-1 focus:ring-black font-mono-label text-xs font-bold text-black"
             />
+          </div>
+
+          {/* RECEPCIONISTA (HASTA ABAJO) */}
+          <div>
+            <label className="font-mono-label text-[10px] font-bold text-black block mb-2 flex items-center gap-1">
+              <UserCheck className="w-3.5 h-3.5 text-black" strokeWidth={2} /> RECEPCIONISTA (QUIEN ATENDIÓ)
+            </label>
+            <select
+              data-testid="floating-receptionist-select"
+              value={receptionistName}
+              onChange={(e) => setReceptionistName(e.target.value)}
+              className="w-full border-2 border-black px-4 py-3 bg-white outline-none focus:ring-1 focus:ring-black font-mono-label text-xs font-bold text-black"
+            >
+              <option value="">— Seleccionar —</option>
+              {receptionists.map((r) => (
+                <option key={r.id} value={r.name}>
+                  {r.name}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div className="flex gap-3 pt-2">
