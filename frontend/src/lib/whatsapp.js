@@ -33,6 +33,7 @@ export function buildBookingWhatsappUrl({
   serviceName,
   specialistName,
   branchName,
+  receptionistName,
 }) {
   const digits = digitsOnly(clientPhone);
   if (!digits) return null;
@@ -48,6 +49,7 @@ export function buildBookingWhatsappUrl({
     `Hora: ${startTime}${endTime ? ` - ${endTime}` : ""}`,
     serviceName ? `Servicio: ${serviceName}` : null,
     specialistName ? `Te atender\u00e1: ${specialistName}` : null,
+    receptionistName ? `Le agend\u00f3: ${receptionistName}` : null,
     "",
     "Si necesitas reagendar, cont\u00e1ctanos con tiempo.",
     "\u00a1Te esperamos!",
@@ -77,6 +79,7 @@ export function buildRescheduleWhatsappUrl({
   serviceName,
   specialistName,
   branchName,
+  receptionistName,
   previousDate,
   previousStartTime,
   previousEndTime,
@@ -96,6 +99,7 @@ export function buildRescheduleWhatsappUrl({
     `Hora: ${startTime}${endTime ? ` - ${endTime}` : ""}`,
     serviceName ? `Servicio: ${serviceName}` : null,
     specialistName ? `Te atender\u00e1: ${specialistName}` : null,
+    receptionistName ? `Le agend\u00f3: ${receptionistName}` : null,
   ];
   if (previousDate && previousStartTime) {
     lines.push("");
