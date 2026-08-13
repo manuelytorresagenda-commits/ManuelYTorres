@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import PageHeader from "../components/PageHeader";
-import { createAppointment, fetchSpecialists, fetchServices, fetchAppointments } from "../lib/api";
+import { createAppointment, fetchSpecialists, fetchServices, fetchAppointments, fetchReceptionists } from "../lib/api";
+import { openBookingWhatsapp } from "../lib/whatsapp";
 import { useAuth } from "../context/AuthContext";
 import { toast } from "sonner";
 import { Check } from "lucide-react";
@@ -17,20 +18,31 @@ export default function NewAppointment() {
   const { branch } = useAuth();
   const [specialists, setSpecialists] = useState([]);
   const [services, setServices] = useState([]);
+  const [receptionists, setReceptionists] = useState([]);
   const [appointments, setAppointments] = useState([]);
 
   const [specialistId, setSpecialistId] = useState("");
   const [serviceId, setServiceId] = useState("");
   const [clientName, setClientName] = useState("");
   const [clientPhone, setClientPhone] = useState("");
+  const [receptionistName, setReceptionistName] = useState("");
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [startTime, setStartTime] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     if (!branch) return;
-    Promise.all([fetchSpecialists({ branch_id: branch.id }), fetchServices({ branch_id: branch.id })]).then(([sp, sv]) => {
-      setSpecialists(sp); setServices(sv);
+    Promise.all([
+      fetchSpecialists({ branch_id: branch.id }), 
+      fetchServices({ branch_id: branch.id }),
+      fetchReceptionists({ branch_id: branch.id })
+    ]).then(([sp, sv, rc]) => {
+      setSpecialists(sp); 
+      setServices(sv);
+      setReceptionists(rc);
+      if (rc.length > 0) {
+        setReceptionistName(rc[0].name);
+      }
     }).catch(() => toast.error("Error cargando datos"));
   }, [branch]);
 
@@ -47,7 +59,6 @@ export default function NewAppointment() {
   const sp = specialists.find((s) => s.id === specialistId);
   const sv = services.find((s) => s.id === serviceId);
 
-  // Generate available time slots based on specialist schedule + service duration, every 30 min
   const slots = (() => {
     if (!sp || !sv) return [];
     const start = timeToMin(sp.start_time);
@@ -70,20 +81,38 @@ export default function NewAppointment() {
   const submit = async (e) => {
     e.preventDefault();
     if (!specialistId || !serviceId || !clientName || !date || !startTime) {
-      toast.error("Complete todos los campos");
+      toast.error("Complete todos los campos obligatorios");
       return;
     }
     setSubmitting(true);
     try {
-      await createAppointment({
+      const createdAppt = await createAppointment({
         specialist_id: specialistId,
         service_id: serviceId,
         client_name: clientName,
         client_phone: clientPhone,
+        receptionist_name: receptionistName,
         date,
         start_time: startTime,
       });
+
       toast.success("Cita registrada");
+
+      if (clientPhone) {
+        const endTimeStr = minToTime(timeToMin(startTime) + sv.duration_minutes);
+        openBookingWhatsapp({
+          clientName,
+          clientPhone,
+          date,
+          startTime,
+          endTime: endTimeStr,
+          serviceName: sv?.name,
+          specialistName: sp?.name,
+          branchName: branch?.name,
+          receptionistName,
+        });
+      }
+
       navigate("/agenda");
     } catch (err) {
       toast.error(err.response?.data?.detail || "No se pudo crear la cita");
@@ -183,6 +212,29 @@ export default function NewAppointment() {
               />
             </div>
             <div>
+              <label className="font-mono-label text-[9px] text-neutral-500 block mb-2">RECEPCIONISTA (QUIEN AGENDA)</label>
+              {receptionists.length > 0 ? (
+                <select
+                  value={receptionistName}
+                  onChange={(e) => setReceptionistName(e.target.value)}
+                  className="w-full border border-black px-4 py-3 bg-white outline-none font-serif-display text-base"
+                >
+                  <option value="">— Sin especificar —</option>
+                  {receptionists.map((r) => (
+                    <option key={r.id} value={r.name}>{r.name}</option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  type="text"
+                  value={receptionistName}
+                  onChange={(e) => setReceptionistName(e.target.value)}
+                  placeholder="Nombre de la recepcionista"
+                  className="w-full border border-black px-4 py-3 bg-white outline-none font-serif-display text-base"
+                />
+              )}
+            </div>
+            <div>
               <label className="font-mono-label text-[9px] text-neutral-500 block mb-2">FECHA</label>
               <input
                 data-testid="date-input"
@@ -234,6 +286,7 @@ export default function NewAppointment() {
                   <strong>{startTime}</strong> — {minToTime(timeToMin(startTime) + sv.duration_minutes)}
                 </div>
                 <div className="text-xs text-neutral-600 mt-1">{sv.name} · {sp?.name}</div>
+                {receptionistName && <div className="text-xs text-neutral-600">Atendido por: {receptionistName}</div>}
                 <div className="text-xs text-neutral-600">Costo: ${sv.cost}</div>
               </div>
             )}
