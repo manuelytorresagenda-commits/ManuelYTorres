@@ -72,6 +72,24 @@ class SpecialistCreate(BaseModel):
     branch_id: Optional[str] = None
 
 
+# --- MODELOS DE RECEPCIONISTAS (NUEVO) ---
+class Receptionist(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str
+    branch_id: Optional[str] = None
+    start_time: Optional[str] = "09:00"
+    end_time: Optional[str] = "18:00"
+    avatar_url: Optional[str] = None
+
+
+class ReceptionistCreate(BaseModel):
+    name: str
+    branch_id: Optional[str] = None
+    start_time: Optional[str] = "09:00"
+    end_time: Optional[str] = "18:00"
+    avatar_url: Optional[str] = None
+
+
 class Service(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     name: str
@@ -121,6 +139,8 @@ class Appointment(BaseModel):
     is_floating: bool = False
     custom_service_name: Optional[str] = None
     custom_duration_minutes: Optional[int] = None
+    receptionist_name: Optional[str] = None  # NUEVO: Nombre de la recepcionista que agendó
+    created_by: Optional[str] = None         # NUEVO: Identificador alternativo de quien creó la cita
     additional_services: List[AdditionalService] = Field(default_factory=list)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
@@ -140,10 +160,18 @@ class AppointmentCreate(BaseModel):
     is_floating: Optional[bool] = False
     custom_service_name: Optional[str] = None
     custom_duration_minutes: Optional[int] = None
+    receptionist_name: Optional[str] = None  # NUEVO: Recepcionista opcional
+    created_by: Optional[str] = None
 
 
 class AppointmentUpdate(BaseModel):
     status: Optional[str] = None
+    client_name: Optional[str] = None
+    client_phone: Optional[str] = None
+    client_instagram: Optional[str] = None
+    client_tiktok: Optional[str] = None
+    client_birthday: Optional[str] = None
+    receptionist_name: Optional[str] = None
     additional_services: Optional[List[AdditionalService]] = None
 
 
@@ -233,14 +261,12 @@ async def _upsert_client(name: str, phone: str, instagram: str, tiktok: str, bir
     clean_name = name.strip()
     clean_phone = (phone or "").strip()
     
-    # 1. Busca coincidencia exacta por NOMBRE + TELÉFONO (o solo Nombre si no hay teléfono)
     query = {"name": {"$regex": f"^{re.escape(clean_name)}$", "$options": "i"}}
     if clean_phone:
         query["phone"] = clean_phone
 
     existing = await db.clients.find_one(query, {"_id": 0})
 
-    # 2. Si la persona exacta ya existe, actualiza sus redes y cumpleaños
     if existing:
         update_fields: dict = {}
         if instagram and existing.get("instagram") != instagram:
@@ -253,7 +279,6 @@ async def _upsert_client(name: str, phone: str, instagram: str, tiktok: str, bir
         if update_fields:
             await db.clients.update_one({"id": existing["id"]}, {"$set": update_fields})
             
-    # 3. Si el nombre es nuevo (aunque comparta teléfono con un familiar), crea un registro nuevo
     else:
         client_obj = Client(
             name=clean_name, 
@@ -402,6 +427,41 @@ async def delete_specialist(specialist_id: str):
     return {"success": True}
 
 
+# ----------------------- RECEPTIONISTS (NUEVO CRUD) -----------------------
+@api_router.post("/receptionists", response_model=Receptionist)
+async def create_receptionist(payload: ReceptionistCreate):
+    rec = Receptionist(**payload.model_dump())
+    await db.receptionists.insert_one(rec.model_dump())
+    return rec
+
+
+@api_router.get("/receptionists", response_model=List[Receptionist])
+async def list_receptionists(branch_id: Optional[str] = None):
+    q = {}
+    if branch_id:
+        q["branch_id"] = branch_id
+    docs = await db.receptionists.find(q, {"_id": 0}).to_list(500)
+    return docs
+
+
+@api_router.put("/receptionists/{receptionist_id}", response_model=Receptionist)
+async def update_receptionist(receptionist_id: str, payload: ReceptionistCreate):
+    existing = await db.receptionists.find_one({"id": receptionist_id}, {"_id": 0})
+    if not existing:
+        raise HTTPException(404, "Recepcionista no encontrada")
+    updated = {**existing, **payload.model_dump()}
+    await db.receptionists.update_one({"id": receptionist_id}, {"$set": payload.model_dump()})
+    return updated
+
+
+@api_router.delete("/receptionists/{receptionist_id}")
+async def delete_receptionist(receptionist_id: str):
+    res = await db.receptionists.delete_one({"id": receptionist_id})
+    if res.deleted_count == 0:
+        raise HTTPException(404, "Recepcionista no encontrada")
+    return {"success": True}
+
+
 # ----------------------- SERVICES (CATÁLOGO GLOBAL) -----------------------
 @api_router.post("/services", response_model=Service)
 async def create_service(payload: ServiceCreate):
@@ -412,7 +472,6 @@ async def create_service(payload: ServiceCreate):
 
 @api_router.get("/services", response_model=List[Service])
 async def list_services(branch_id: Optional[str] = None):
-    # Devuelve el catálogo completo de servicios para cualquier sucursal
     docs = await db.services.find({}, {"_id": 0}).to_list(500)
     return docs
 
@@ -554,6 +613,8 @@ async def create_appointment(payload: AppointmentCreate):
             is_floating=is_floating,
             custom_service_name=payload.custom_service_name if is_floating else None,
             custom_duration_minutes=duration if is_floating else None,
+            receptionist_name=payload.receptionist_name,  # Guardar la recepcionista
+            created_by=payload.created_by,
         )
         doc = appt.model_dump()
         doc["created_at"] = doc["created_at"].isoformat()
@@ -614,6 +675,53 @@ async def update_appointment(appt_id: str, payload: AppointmentUpdate):
             existing["created_at"] = datetime.fromisoformat(existing["created_at"])
         except ValueError:
             existing["created_at"] = datetime.now(timezone.utc)
+    
+    # Si actualizaron los datos del cliente, refrescar datos en la colección de clientes
+    if any(k in update for k in ["client_name", "client_phone", "client_instagram", "client_tiktok", "client_birthday"]):
+        await _upsert_client(
+            name=existing.get("client_name", ""),
+            phone=existing.get("client_phone", ""),
+            instagram=existing.get("client_instagram", ""),
+            tiktok=existing.get("client_tiktok", ""),
+            birthday=existing.get("client_birthday", ""),
+        )
+
+    return existing
+
+
+# NUEVO: Endpoint PUT para edición completa de la cita desde el modal de detalles
+@api_router.put("/appointments/{appt_id}", response_model=Appointment)
+async def update_appointment_full(appt_id: str, data: dict):
+    existing = await db.appointments.find_one({"id": appt_id}, {"_id": 0})
+    if not existing:
+        raise HTTPException(404, "Cita no encontrada")
+
+    # Limpiar IDs si vienen en el body
+    data.pop("id", None)
+    data.pop("_id", None)
+
+    if "client_instagram" in data:
+        data["client_instagram"] = _normalize_handle(data["client_instagram"])
+    if "client_tiktok" in data:
+        data["client_tiktok"] = _normalize_handle(data["client_tiktok"])
+
+    await db.appointments.update_one({"id": appt_id}, {"$set": data})
+    existing.update(data)
+
+    await _upsert_client(
+        name=existing.get("client_name", ""),
+        phone=existing.get("client_phone", ""),
+        instagram=existing.get("client_instagram", ""),
+        tiktok=existing.get("client_tiktok", ""),
+        birthday=existing.get("client_birthday", ""),
+    )
+
+    if isinstance(existing.get("created_at"), str):
+        try:
+            existing["created_at"] = datetime.fromisoformat(existing["created_at"])
+        except ValueError:
+            existing["created_at"] = datetime.now(timezone.utc)
+
     return existing
 
 
@@ -905,6 +1013,7 @@ async def on_startup():
         await db.appointments.create_index("id", unique=True)
         await db.specialists.create_index("id", unique=True)
         await db.specialists.create_index("access_code")
+        await db.receptionists.create_index("id", unique=True)  # Indice para recepcionistas
         await db.services.create_index("id", unique=True)
         await db.branches.create_index("id", unique=True)
         await db.clients.create_index("phone")
