@@ -4,6 +4,7 @@ import {
   fetchServices, createService, updateService, deleteService,
   fetchSpecialists, createSpecialist, updateSpecialist, deleteSpecialist,
   fetchBranches, createBranch, updateBranch, deleteBranch,
+  fetchReceptionists, createReceptionist, updateReceptionist, deleteReceptionist,
   verifyMasterPin,
 } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
@@ -240,16 +241,13 @@ export default function Catalog() {
 
   const load = async () => {
     try {
-      const [sv, sp, br] = await Promise.all([
+      const [sv, sp, br, rc] = await Promise.all([
         fetchServices(branch ? { branch_id: branch.id } : {}),
         fetchSpecialists(),
         fetchBranches(),
+        fetchReceptionists(branch ? { branch_id: branch.id } : {}),
       ]);
-      setServices(sv); setSpecialists(sp); setBranches(br);
-
-      // Cargar recepcionistas desde localStorage (fallback local seguro)
-      const storedRecs = JSON.parse(localStorage.getItem("myt_receptionists") || "[]");
-      setReceptionists(storedRecs);
+      setServices(sv); setSpecialists(sp); setBranches(br); setReceptionists(rc);
     } catch { toast.error("Error cargando datos"); }
   };
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [branch]);
@@ -282,19 +280,19 @@ export default function Catalog() {
     } catch { toast.error("No se pudo guardar"); }
   };
 
-  const handleReceptionistSubmit = (data) => {
+  const handleReceptionistSubmit = async (data) => {
     try {
-      let updated = [...receptionists];
-      if (editing?.type === "receptionist") {
-        updated = updated.map((r) => r.id === editing.item.id ? { ...r, ...data } : r);
-      } else {
-        const newItem = { id: `rec_${Date.now()}`, ...data };
-        updated.push(newItem);
+      if (!data.branch_id) {
+        toast.error("Seleccione una sucursal");
+        return;
       }
-      localStorage.setItem("myt_receptionists", JSON.stringify(updated));
-      setReceptionists(updated);
+      if (editing?.type === "receptionist") {
+        await updateReceptionist(editing.item.id, data);
+      } else {
+        await createReceptionist(data);
+      }
       toast.success("Recepcionista guardada");
-      setEditing(null); setCreating(null);
+      setEditing(null); setCreating(null); load();
     } catch { toast.error("No se pudo guardar"); }
   };
 
@@ -319,12 +317,10 @@ export default function Catalog() {
     catch { toast.error("Error al eliminar"); }
   };
 
-  const removeReceptionist = (id) => {
+  const removeReceptionist = async (id) => {
     if (!window.confirm("¿Eliminar esta recepcionista?")) return;
-    const updated = receptionists.filter((r) => r.id !== id);
-    localStorage.setItem("myt_receptionists", JSON.stringify(updated));
-    setReceptionists(updated);
-    toast.success("Eliminada");
+    try { await deleteReceptionist(id); toast.success("Eliminada"); load(); }
+    catch { toast.error("Error al eliminar"); }
   };
 
   const removeBranch = async (id) => {
