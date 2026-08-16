@@ -1,4 +1,5 @@
 from fastapi import FastAPI, APIRouter, HTTPException
+from fastapi.responses import PlainTextResponse, JSONResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -11,7 +12,6 @@ from pydantic import BaseModel, Field
 from typing import List, Optional
 import uuid
 from datetime import datetime, timezone, timedelta
-
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -27,6 +27,24 @@ MASTER_PIN = "0000"   # PIN maestro (acciones administrativas)
 
 app = FastAPI()
 api_router = APIRouter(prefix="/api")
+
+
+# ----------------------- HEALTHCHECKS ULTRALIGEROS (BLINDAJE CRON) -----------------------
+@app.api_route("/health", methods=["GET", "HEAD"], response_class=PlainTextResponse)
+async def app_health():
+    return "ok"
+
+@api_router.api_route("/health", methods=["GET", "HEAD"], response_class=PlainTextResponse)
+async def api_health():
+    return "ok"
+
+@app.api_route("/", methods=["GET", "HEAD"])
+async def app_root():
+    return {"status": "ok", "app": "Manuel & Torres API"}
+
+@api_router.api_route("/", methods=["GET", "HEAD"])
+async def router_root():
+    return {"status": "ok", "router": "api"}
 
 
 # ----------------------- MODELS -----------------------
@@ -72,7 +90,6 @@ class SpecialistCreate(BaseModel):
     branch_id: Optional[str] = None
 
 
-# --- MODELOS DE RECEPCIONISTAS (NUEVO) ---
 class Receptionist(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     name: str
@@ -139,8 +156,8 @@ class Appointment(BaseModel):
     is_floating: bool = False
     custom_service_name: Optional[str] = None
     custom_duration_minutes: Optional[int] = None
-    receptionist_name: Optional[str] = None  # NUEVO: Nombre de la recepcionista que agendó
-    created_by: Optional[str] = None         # NUEVO: Identificador alternativo de quien creó la cita
+    receptionist_name: Optional[str] = None
+    created_by: Optional[str] = None
     additional_services: List[AdditionalService] = Field(default_factory=list)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
@@ -160,7 +177,7 @@ class AppointmentCreate(BaseModel):
     is_floating: Optional[bool] = False
     custom_service_name: Optional[str] = None
     custom_duration_minutes: Optional[int] = None
-    receptionist_name: Optional[str] = None  # NUEVO: Recepcionista opcional
+    receptionist_name: Optional[str] = None
     created_by: Optional[str] = None
 
 
@@ -253,7 +270,6 @@ def _normalize_birthday(value: Optional[str]) -> str:
     return v
 
 
-# --- LÓGICA DE CLIENTES MEJORADA PARA SOPORTAR FAMILIARES CON EL MISMO TELÉFONO ---
 async def _upsert_client(name: str, phone: str, instagram: str, tiktok: str, birthday: str) -> None:
     if not name:
         return
@@ -303,10 +319,10 @@ async def _get_appt_lock(specialist_id: str, date: str) -> asyncio.Lock:
             _appt_locks[key] = lock
         return lock
 
+
 # ----------------------- AUTH -----------------------
 @api_router.post("/auth/verify-pin")
 async def verify_pin(payload: PinVerify):
-    print(f"--- Intento de login (entry) con PIN: {payload.pin} ---")
     if payload.pin == APP_PIN:
         return {"success": True}
     raise HTTPException(status_code=401, detail="PIN incorrecto")
@@ -314,7 +330,6 @@ async def verify_pin(payload: PinVerify):
 
 @api_router.post("/auth/verify-master-pin")
 async def verify_master_pin(payload: PinVerify):
-    print(f"--- Verificación PIN maestro: {payload.pin} ---")
     if payload.pin == MASTER_PIN:
         return {"success": True}
     raise HTTPException(status_code=401, detail="PIN maestro incorrecto")
@@ -322,7 +337,6 @@ async def verify_master_pin(payload: PinVerify):
 
 @api_router.post("/auth/specialist-login", response_model=Specialist)
 async def specialist_login(payload: SpecialistLogin):
-    print(f"--- Intento de login Especialista: {payload.access_code} ---")
     code = (payload.access_code or "").strip()
     if not code:
         raise HTTPException(status_code=400, detail="Código requerido")
@@ -330,6 +344,7 @@ async def specialist_login(payload: SpecialistLogin):
     if not sp:
         raise HTTPException(status_code=401, detail="Código inválido")
     return sp
+
 
 # ----------------------- BRANCHES -----------------------
 @api_router.post("/branches", response_model=Branch)
@@ -339,9 +354,11 @@ async def create_branch(payload: BranchCreate):
     return br
 
 
-@api_router.get("/branches", response_model=List[Branch])
+@api_router.get("/branches")
 async def list_branches():
-    docs = await db.branches.find({}, {"_id": 0, "pin": 0}).to_list(500)
+    docs = await db.branches.find({}, {"_id": 0}).to_list(500)
+    for d in docs:
+        d.pop("pin", None)
     return docs
 
 
@@ -427,7 +444,7 @@ async def delete_specialist(specialist_id: str):
     return {"success": True}
 
 
-# ----------------------- RECEPTIONISTS (NUEVO CRUD) -----------------------
+# ----------------------- RECEPTIONISTS -----------------------
 @api_router.post("/receptionists", response_model=Receptionist)
 async def create_receptionist(payload: ReceptionistCreate):
     rec = Receptionist(**payload.model_dump())
@@ -462,7 +479,7 @@ async def delete_receptionist(receptionist_id: str):
     return {"success": True}
 
 
-# ----------------------- SERVICES (CATÁLOGO GLOBAL) -----------------------
+# ----------------------- SERVICES -----------------------
 @api_router.post("/services", response_model=Service)
 async def create_service(payload: ServiceCreate):
     sv = Service(**payload.model_dump())
@@ -613,7 +630,7 @@ async def create_appointment(payload: AppointmentCreate):
             is_floating=is_floating,
             custom_service_name=payload.custom_service_name if is_floating else None,
             custom_duration_minutes=duration if is_floating else None,
-            receptionist_name=payload.receptionist_name,  # Guardar la recepcionista
+            receptionist_name=payload.receptionist_name,
             created_by=payload.created_by,
         )
         doc = appt.model_dump()
@@ -676,7 +693,6 @@ async def update_appointment(appt_id: str, payload: AppointmentUpdate):
         except ValueError:
             existing["created_at"] = datetime.now(timezone.utc)
     
-    # Si actualizaron los datos del cliente, refrescar datos en la colección de clientes
     if any(k in update for k in ["client_name", "client_phone", "client_instagram", "client_tiktok", "client_birthday"]):
         await _upsert_client(
             name=existing.get("client_name", ""),
@@ -689,14 +705,12 @@ async def update_appointment(appt_id: str, payload: AppointmentUpdate):
     return existing
 
 
-# NUEVO: Endpoint PUT para edición completa de la cita desde el modal de detalles
 @api_router.put("/appointments/{appt_id}", response_model=Appointment)
 async def update_appointment_full(appt_id: str, data: dict):
     existing = await db.appointments.find_one({"id": appt_id}, {"_id": 0})
     if not existing:
         raise HTTPException(404, "Cita no encontrada")
 
-    # Limpiar IDs si vienen en el body
     data.pop("id", None)
     data.pop("_id", None)
 
@@ -849,7 +863,6 @@ SAMPLE_SERVICES = [
 
 
 async def seed_data():
-    # Branches
     br_count = await db.branches.count_documents({})
     if br_count == 0:
         for b in SAMPLE_BRANCHES:
@@ -887,7 +900,6 @@ async def seed_data():
                 )
     branches = await db.branches.find({}, {"_id": 0}).to_list(20)
 
-    # Specialists
     sp_count = await db.specialists.count_documents({})
     if sp_count == 0 and branches:
         for s in SAMPLE_SPECIALISTS:
@@ -914,14 +926,12 @@ async def seed_data():
                 {"$set": {"branch_id": branches[0]["id"]}}
             )
 
-    # Services (Global initial seed if empty)
     sv_count = await db.services.count_documents({})
     if sv_count == 0:
         for s in SAMPLE_SERVICES:
             sv = Service(**s)
             await db.services.insert_one(sv.model_dump())
 
-    # Backfill branch_id on appointments based on their specialist
     appts_without_branch = await db.appointments.find(
         {"$or": [{"branch_id": None}, {"branch_id": {"$exists": False}}]},
         {"_id": 0}
@@ -933,7 +943,6 @@ async def seed_data():
                 {"id": a["id"]}, {"$set": {"branch_id": sp["branch_id"]}}
             )
 
-    # Sample appointments for today (only if none)
     appt_count = await db.appointments.count_documents({})
     if appt_count == 0:
         specialists = await db.specialists.find({}, {"_id": 0}).to_list(10)
@@ -971,23 +980,6 @@ async def trigger_seed():
     return {"success": True}
 
 
-# --- ENDPOINTS DUALES (GET + HEAD) EN EL ROUTER /API Y EN APP RAIZ ---
-@api_router.api_route("/", methods=["GET", "HEAD"])
-async def router_root():
-    return {"message": "Clinic API", "ok": True}
-
-@api_router.api_route("/health", methods=["GET", "HEAD"])
-async def router_health_check():
-    return {"status": "ok"}
-
-@app.api_route("/", methods=["GET", "HEAD"])
-async def app_root():
-    return {"message": "Clinic API Root", "ok": True}
-
-@app.api_route("/health", methods=["GET", "HEAD"])
-async def app_health_check():
-    return {"status": "ok"}
-
 # Include the router
 app.include_router(api_router)
 
@@ -1013,7 +1005,7 @@ async def on_startup():
         await db.appointments.create_index("id", unique=True)
         await db.specialists.create_index("id", unique=True)
         await db.specialists.create_index("access_code")
-        await db.receptionists.create_index("id", unique=True)  # Indice para recepcionistas
+        await db.receptionists.create_index("id", unique=True)
         await db.services.create_index("id", unique=True)
         await db.branches.create_index("id", unique=True)
         await db.clients.create_index("phone")
