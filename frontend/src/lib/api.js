@@ -50,3 +50,4 @@ export const deleteAppointment = (id) => api.delete(`/appointments/${id}`).then(
 
 // Clientes
 export const fetchClients = (q) => api.get("/clients", { params: q ? { q } : {} }).then((r) => r.data);
+export const createClient = (data) => api.post("/clients", data).then((r) => r.data);
