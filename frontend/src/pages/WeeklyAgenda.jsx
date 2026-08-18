@@ -5,9 +5,15 @@ import NewAppointmentModal from "../components/NewAppointmentModal";
 import FloatingAppointmentModal from "../components/FloatingAppointmentModal";
 import AppointmentDetailModal from "../components/AppointmentDetailModal";
 import NewClientModal from "../components/NewClientModal";
-import { fetchAppointments, fetchSpecialists, fetchServices } from "../lib/api";
+import {
+  fetchAppointments,
+  fetchSpecialists,
+  fetchServices,
+  updateAppointmentStatus,
+  deleteAppointment,
+} from "../lib/api";
 import { useAuth } from "../context/AuthContext";
-import { ChevronLeft, ChevronRight, Plus, Wind, UserPlus } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, Wind, UserPlus, Trash2, Play, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import { SLOTS, minToTime, buildOverlapGrid } from "../lib/scheduling";
 
@@ -97,6 +103,27 @@ export default function WeeklyAgenda() {
     const end = new Date(weekStart); end.setDate(end.getDate() + 6);
     const f = (d) => d.toLocaleDateString("es-ES", { day: "numeric", month: "short" });
     return `${f(weekStart)} — ${f(end)}`;
+  };
+
+  const changeStatus = async (id, status) => {
+    try {
+      await updateAppointmentStatus(id, status);
+      toast.success(`Cita ${status.toLowerCase()}`);
+      load();
+    } catch {
+      toast.error("No se pudo actualizar");
+    }
+  };
+
+  const handleDelete = async (id) => {
+    if (!window.confirm("¿Eliminar esta cita?")) return;
+    try {
+      await deleteAppointment(id);
+      toast.success("Cita eliminada");
+      load();
+    } catch {
+      toast.error("No se pudo eliminar");
+    }
   };
 
   const openModalForCell = (dateStr, slotMin) => {
@@ -266,16 +293,21 @@ export default function WeeklyAgenda() {
                                         <span className="font-mono-label text-[9px] font-bold">
                                           {a.start_time}–{a.end_time}
                                         </span>
-                                        {a.is_floating && (
-                                          <span className="font-mono-label text-[7px] font-bold bg-sky-400 text-black px-1 border border-black">
-                                            FLOT
+                                        <div className="flex items-center gap-1">
+                                          {a.is_floating && (
+                                            <span className="font-mono-label text-[7px] font-bold bg-sky-400 text-black px-1 border border-black">
+                                              FLOT
+                                            </span>
+                                          )}
+                                          {a.is_overbooked && !a.is_floating && (
+                                            <span className="font-mono-label text-[7px] font-bold bg-amber-400 text-black px-1 border border-black">
+                                              EXTRA
+                                            </span>
+                                          )}
+                                          <span className="font-mono-label text-[8px] font-bold opacity-90">
+                                            {a.status}
                                           </span>
-                                        )}
-                                        {a.is_overbooked && !a.is_floating && (
-                                          <span className="font-mono-label text-[7px] font-bold bg-amber-400 text-black px-1 border border-black">
-                                            EXTRA
-                                          </span>
-                                        )}
+                                        </div>
                                       </div>
                                       <div className="font-serif-display text-base font-bold leading-tight break-words mt-1">
                                         {a.client_name}
@@ -284,11 +316,44 @@ export default function WeeklyAgenda() {
                                         {serviceLabel}
                                       </div>
                                     </div>
-                                    {sp && (
-                                      <div className="font-mono-label text-[8px] font-bold opacity-90 uppercase mt-auto pt-1">
-                                        {sp.name}
+                                    <div className="mt-auto pt-2">
+                                      {sp && (
+                                        <div className="font-mono-label text-[8px] font-bold opacity-90 uppercase mb-1.5">
+                                          {sp.name}
+                                        </div>
+                                      )}
+                                      <div
+                                        className="flex flex-wrap gap-1"
+                                        onClick={(e) => e.stopPropagation()}
+                                      >
+                                        {a.status === "Confirmada" && (
+                                          <button
+                                            onClick={() => changeStatus(a.id, "En curso")}
+                                            data-testid={`week-start-${a.id}`}
+                                            className="btn-invert border border-current px-1.5 py-0.5 font-mono-label text-[8px] font-bold hover:bg-current hover:text-white flex items-center gap-0.5"
+                                          >
+                                            <Play className="w-2 h-2" strokeWidth={2} /> Iniciar
+                                          </button>
+                                        )}
+                                        {a.status === "En curso" && (
+                                          <button
+                                            onClick={() => changeStatus(a.id, "Finalizada")}
+                                            data-testid={`week-finish-${a.id}`}
+                                            className="btn-invert border border-current px-1.5 py-0.5 font-mono-label text-[8px] font-bold hover:bg-white hover:text-black flex items-center gap-0.5"
+                                          >
+                                            <CheckCircle2 className="w-2 h-2" strokeWidth={2} /> Finalizar
+                                          </button>
+                                        )}
+                                        <button
+                                          onClick={() => handleDelete(a.id)}
+                                          data-testid={`week-delete-${a.id}`}
+                                          className="btn-invert border border-current/70 p-1 hover:bg-current hover:text-white"
+                                          aria-label="Eliminar"
+                                        >
+                                          <Trash2 className="w-2.5 h-2.5" strokeWidth={2} />
+                                        </button>
                                       </div>
-                                    )}
+                                    </div>
                                   </div>
                                 );
                               })}
