@@ -4,6 +4,7 @@ import SpecialistFilter from "../components/SpecialistFilter";
 import NewAppointmentModal from "../components/NewAppointmentModal";
 import FloatingAppointmentModal from "../components/FloatingAppointmentModal";
 import AppointmentDetailModal from "../components/AppointmentDetailModal";
+import NewClientModal from "../components/NewClientModal";
 import {
   fetchAppointments,
   fetchSpecialists,
@@ -12,7 +13,7 @@ import {
   deleteAppointment,
 } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
-import { Plus, Trash2, Play, CheckCircle2, Calendar, Wind } from "lucide-react";
+import { Plus, Trash2, Play, CheckCircle2, Calendar, Wind, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import { SLOTS, timeToMin, minToTime, buildOverlapGrid } from "../lib/scheduling";
 
@@ -43,6 +44,7 @@ export default function DailyAgenda() {
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [modalOpen, setModalOpen] = useState(false);
   const [floatingModalOpen, setFloatingModalOpen] = useState(false);
+  const [clientModalOpen, setClientModalOpen] = useState(false);
   const [modalSpecialistId, setModalSpecialistId] = useState("");
   const [modalStartTime, setModalStartTime] = useState("");
   const [detailAppt, setDetailAppt] = useState(null);
@@ -148,9 +150,17 @@ export default function DailyAgenda() {
         action={
           <div className="flex items-center gap-2">
             <button
+              data-testid="header-save-client-btn"
+              onClick={() => setClientModalOpen(true)}
+              className="btn-invert border border-black bg-white text-black px-4 py-3 font-mono-label text-[10px] font-bold hover:bg-neutral-100 flex items-center gap-2 transition-colors"
+            >
+              <UserPlus className="w-3 h-3" strokeWidth={2} />
+              Guardar Cliente
+            </button>
+            <button
               data-testid="header-floating-btn"
               onClick={() => setFloatingModalOpen(true)}
-              className="btn-invert border border-black bg-sky-400 text-black px-4 py-3 font-mono-label text-[10px] font-bold hover:bg-black hover:text-white flex items-center gap-2"
+              className="btn-invert border border-black bg-sky-400 text-black px-4 py-3 font-mono-label text-[10px] font-bold hover:bg-black hover:text-white flex items-center gap-2 transition-colors"
             >
               <Wind className="w-3 h-3" strokeWidth={2} />
               Cita Flotante
@@ -158,7 +168,7 @@ export default function DailyAgenda() {
             <button
               data-testid="header-new-appointment-btn"
               onClick={openModalEmpty}
-              className="btn-invert border border-black bg-black text-white px-6 py-3 font-mono-label text-[10px] font-bold hover:bg-white hover:text-black flex items-center gap-2"
+              className="btn-invert border border-black bg-black text-white px-6 py-3 font-mono-label text-[10px] font-bold hover:bg-white hover:text-black flex items-center gap-2 transition-colors"
             >
               <Plus className="w-3 h-3" strokeWidth={2} />
               Nueva Cita
@@ -462,6 +472,11 @@ export default function DailyAgenda() {
         onClose={() => setFloatingModalOpen(false)}
         onCreated={load}
         specialists={specialists}
+      />
+
+      <NewClientModal
+        open={clientModalOpen}
+        onClose={() => setClientModalOpen(false)}
       />
 
       <AppointmentDetailModal
