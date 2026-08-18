@@ -133,6 +133,14 @@ class Client(BaseModel):
     birthday: Optional[str] = ""  # "YYYY-MM-DD" or "MM-DD" or ""
 
 
+class ClientCreate(BaseModel):
+    name: str
+    phone: Optional[str] = ""
+    instagram: Optional[str] = ""
+    tiktok: Optional[str] = ""
+    birthday: Optional[str] = ""
+
+
 class AdditionalService(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     name: str
@@ -511,6 +519,34 @@ async def delete_service(service_id: str):
 
 
 # ----------------------- CLIENTS -----------------------
+@api_router.post("/clients", response_model=Client)
+async def create_client(payload: ClientCreate):
+    name_clean = (payload.name or "").strip()
+    if not name_clean:
+        raise HTTPException(400, "Nombre del cliente requerido")
+
+    phone_clean = (payload.phone or "").strip()
+    instagram_clean = _normalize_handle(payload.instagram)
+    tiktok_clean = _normalize_handle(payload.tiktok)
+    birthday_clean = _normalize_birthday(payload.birthday)
+
+    # Upsert o creación con _upsert_client existente
+    await _upsert_client(
+        name=name_clean,
+        phone=phone_clean,
+        instagram=instagram_clean,
+        tiktok=tiktok_clean,
+        birthday=birthday_clean,
+    )
+
+    # Devolvemos el documento creado o actualizado
+    query = {"name": {"$regex": f"^{re.escape(name_clean)}$", "$options": "i"}}
+    if phone_clean:
+        query["phone"] = phone_clean
+    doc = await db.clients.find_one(query, {"_id": 0})
+    return doc
+
+
 @api_router.get("/clients", response_model=List[Client])
 async def list_clients(q: Optional[str] = None, limit: int = 20):
     query = {}
