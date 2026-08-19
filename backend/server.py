@@ -224,6 +224,34 @@ class VacationCreate(BaseModel):
     reason: Optional[str] = "Vacaciones"
 
 
+class Coverage(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    target_branch_id: str
+    is_guest: bool = False  # False = Estilista interno de otra sucursal, True = Invitado externo
+    specialist_id: Optional[str] = None
+    guest_name: Optional[str] = ""
+    specialty: Optional[str] = "Estilista"
+    start_time: Optional[str] = "09:00"
+    end_time: Optional[str] = "18:00"
+    start_date: str  # "YYYY-MM-DD"
+    end_date: str    # "YYYY-MM-DD"
+    reason: Optional[str] = "Apoyo"
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class CoverageCreate(BaseModel):
+    target_branch_id: str
+    is_guest: Optional[bool] = False
+    specialist_id: Optional[str] = None
+    guest_name: Optional[str] = ""
+    specialty: Optional[str] = "Estilista"
+    start_time: Optional[str] = "09:00"
+    end_time: Optional[str] = "18:00"
+    start_date: str
+    end_date: str
+    reason: Optional[str] = "Apoyo"
+
+
 class PinVerify(BaseModel):
     pin: str
 
@@ -711,6 +739,94 @@ async def cancel_vacation_single_day(vacation_id: str, date: str):
     return {"success": True, "message": "Día intermedio removido y periodo dividido"}
 
 
+# ----------------------- COVERAGES / GUEST SPECIALISTS (NUEVO) -----------------------
+@api_router.post("/coverages", response_model=Coverage)
+async def create_coverage(payload: CoverageCreate):
+    _validate_date(payload.start_date)
+    _validate_date(payload.end_date)
+    
+    if payload.start_date > payload.end_date:
+        raise HTTPException(400, "La fecha de inicio no puede ser posterior a la de fin")
+
+    target_br = await db.branches.find_one({"id": payload.target_branch_id}, {"_id": 0})
+    if not target_br:
+        raise HTTPException(400, "Sucursal destino no encontrada")
+
+    if not payload.is_guest:
+        if not payload.specialist_id:
+            raise HTTPException(400, "Especialista interno requerido")
+        sp = await db.specialists.find_one({"id": payload.specialist_id}, {"_id": 0})
+        if not sp:
+            raise HTTPException(400, "Especialista no encontrado")
+        guest_name = sp.get("name", "")
+        specialty = sp.get("specialty", "Estilista")
+        start_time = sp.get("start_time", "09:00")
+        end_time = sp.get("end_time", "18:00")
+    else:
+        guest_name = (payload.guest_name or "").strip()
+        if not guest_name:
+            raise HTTPException(400, "Nombre del estilista invitado requerido")
+        specialty = (payload.specialty or "Estilista Invitado").strip()
+        start_time = _validate_time(payload.start_time or "09:00", "hora inicio")
+        end_time = _validate_time(payload.end_time or "18:00", "hora fin")
+
+    cov = Coverage(
+        target_branch_id=payload.target_branch_id,
+        is_guest=bool(payload.is_guest),
+        specialist_id=payload.specialist_id if not payload.is_guest else None,
+        guest_name=guest_name,
+        specialty=specialty,
+        start_time=start_time,
+        end_time=end_time,
+        start_date=payload.start_date,
+        end_date=payload.end_date,
+        reason=payload.reason or "Apoyo",
+    )
+    doc = cov.model_dump()
+    doc["created_at"] = doc["created_at"].isoformat()
+    await db.coverages.insert_one(doc)
+    return cov
+
+
+@api_router.get("/coverages", response_model=List[Coverage])
+async def list_coverages(
+    date: Optional[str] = None,
+    week_start: Optional[str] = None,
+    target_branch_id: Optional[str] = None
+):
+    q = {}
+    if target_branch_id:
+        q["target_branch_id"] = target_branch_id
+
+    if date:
+        _validate_date(date)
+        q["start_date"] = {"$lte": date}
+        q["end_date"] = {"$gte": date}
+    elif week_start:
+        _validate_date(week_start)
+        start_d = datetime.strptime(week_start, "%Y-%m-%d")
+        week_end = (start_d + timedelta(days=6)).strftime("%Y-%m-%d")
+        q["start_date"] = {"$lte": week_end}
+        q["end_date"] = {"$gte": week_start}
+
+    docs = await db.coverages.find(q, {"_id": 0}).to_list(500)
+    for d in docs:
+        if isinstance(d.get("created_at"), str):
+            try:
+                d["created_at"] = datetime.fromisoformat(d["created_at"])
+            except ValueError:
+                d["created_at"] = datetime.now(timezone.utc)
+    return docs
+
+
+@api_router.delete("/coverages/{coverage_id}")
+async def delete_coverage(coverage_id: str):
+    res = await db.coverages.delete_one({"id": coverage_id})
+    if res.deleted_count == 0:
+        raise HTTPException(404, "Registro de apoyo no encontrado")
+    return {"success": True}
+
+
 # ----------------------- APPOINTMENTS -----------------------
 @api_router.post("/appointments", response_model=Appointment)
 async def create_appointment(payload: AppointmentCreate):
@@ -719,11 +835,31 @@ async def create_appointment(payload: AppointmentCreate):
     if not (payload.client_name or "").strip():
         raise HTTPException(400, "Nombre del cliente requerido")
 
+    # Buscar si es especialista de planta o un invitado/cobertura temporal
     specialist = await db.specialists.find_one({"id": payload.specialist_id}, {"_id": 0})
-    if not specialist:
-        raise HTTPException(400, "Especialista no encontrado")
+    coverage_active = None
 
-    # Verificar si el especialista está de vacaciones en esa fecha
+    if not specialist:
+        # Puede ser un invitado externo por ID de cobertura
+        cov = await db.coverages.find_one({
+            "id": payload.specialist_id,
+            "start_date": {"$lte": payload.date},
+            "end_date": {"$gte": payload.date}
+        }, {"_id": 0})
+        if cov:
+            coverage_active = cov
+            specialist = {
+                "id": cov["id"],
+                "name": cov.get("guest_name", "Invitado"),
+                "specialty": cov.get("specialty", "Estilista"),
+                "start_time": cov.get("start_time", "09:00"),
+                "end_time": cov.get("end_time", "18:00"),
+                "branch_id": cov.get("target_branch_id"),
+            }
+        else:
+            raise HTTPException(400, "Especialista o invitado no encontrado / no activo en esta fecha")
+
+    # Verificar si está de vacaciones
     vacation = await db.vacations.find_one({
         "specialist_id": payload.specialist_id,
         "start_date": {"$lte": payload.date},
@@ -772,7 +908,7 @@ async def create_appointment(payload: AppointmentCreate):
     if start_min < sp_start or end_min > sp_end:
         raise HTTPException(
             400,
-            f"Horario fuera del turno del especialista ({specialist['start_time']} - {specialist['end_time']})"
+            f"Horario fuera del turno ({specialist['start_time']} - {specialist['end_time']})"
         )
 
     status_value = payload.status or "Confirmada"
@@ -795,7 +931,7 @@ async def create_appointment(payload: AppointmentCreate):
                 if overlaps(start_min, end_min, a_start, a_end):
                     raise HTTPException(
                         409,
-                        f"Conflicto: el especialista ya tiene una cita de {a['start_time']} a {a['end_time']}"
+                        f"Conflicto: ya existe una cita registrada de {a['start_time']} a {a['end_time']}"
                     )
 
         appt = Appointment(
@@ -944,7 +1080,22 @@ async def reschedule_appointment(appt_id: str, payload: AppointmentReschedule):
     new_specialist_id = payload.specialist_id or existing["specialist_id"]
     specialist = await db.specialists.find_one({"id": new_specialist_id}, {"_id": 0})
     if not specialist:
-        raise HTTPException(400, "Especialista no encontrado")
+        cov = await db.coverages.find_one({
+            "id": new_specialist_id,
+            "start_date": {"$lte": payload.date},
+            "end_date": {"$gte": payload.date}
+        }, {"_id": 0})
+        if cov:
+            specialist = {
+                "id": cov["id"],
+                "name": cov.get("guest_name", "Invitado"),
+                "specialty": cov.get("specialty", "Estilista"),
+                "start_time": cov.get("start_time", "09:00"),
+                "end_time": cov.get("end_time", "18:00"),
+                "branch_id": cov.get("target_branch_id"),
+            }
+        else:
+            raise HTTPException(400, "Especialista no encontrado")
 
     # Verificar si está de vacaciones
     vacation = await db.vacations.find_one({
@@ -979,7 +1130,7 @@ async def reschedule_appointment(appt_id: str, payload: AppointmentReschedule):
     if new_start < sp_start or new_end > sp_end:
         raise HTTPException(
             400,
-            f"Horario fuera del turno del especialista ({specialist['start_time']} - {specialist['end_time']})"
+            f"Horario fuera del turno ({specialist['start_time']} - {specialist['end_time']})"
         )
 
     skip_conflict = bool(existing.get("is_overbooked")) or bool(existing.get("is_floating"))
@@ -1002,7 +1153,7 @@ async def reschedule_appointment(appt_id: str, payload: AppointmentReschedule):
                 if overlaps(new_start, new_end, a_start, a_end):
                     raise HTTPException(
                         409,
-                        f"Conflicto: el especialista ya tiene una cita de {a['start_time']} a {a['end_time']}",
+                        f"Conflicto: ya existe una cita registrada de {a['start_time']} a {a['end_time']}",
                     )
 
         await db.appointments.update_one(
@@ -1208,6 +1359,8 @@ async def on_startup():
         await db.vacations.create_index([("specialist_id", 1), ("start_date", 1), ("end_date", 1)])
         await db.vacations.create_index([("branch_id", 1), ("start_date", 1), ("end_date", 1)])
         await db.vacations.create_index("id", unique=True)
+        await db.coverages.create_index([("target_branch_id", 1), ("start_date", 1), ("end_date", 1)])
+        await db.coverages.create_index("id", unique=True)
         logger.info("Indexes ensured")
     except Exception as e:
         logger.error(f"Index creation failed: {e}")
