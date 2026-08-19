@@ -5,15 +5,18 @@ import NewAppointmentModal from "../components/NewAppointmentModal";
 import FloatingAppointmentModal from "../components/FloatingAppointmentModal";
 import AppointmentDetailModal from "../components/AppointmentDetailModal";
 import NewClientModal from "../components/NewClientModal";
+import VacationModal from "../components/VacationModal";
 import {
   fetchAppointments,
   fetchSpecialists,
   fetchServices,
+  fetchVacations,
+  deleteVacation,
   updateAppointmentStatus,
   deleteAppointment,
 } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
-import { Plus, Trash2, Play, CheckCircle2, Calendar, Wind, UserPlus } from "lucide-react";
+import { Plus, Trash2, Play, CheckCircle2, Calendar, Wind, UserPlus, Palmtree } from "lucide-react";
 import { toast } from "sonner";
 import { SLOTS, timeToMin, minToTime, buildOverlapGrid } from "../lib/scheduling";
 
@@ -39,12 +42,14 @@ export default function DailyAgenda() {
   const [appointments, setAppointments] = useState([]);
   const [specialists, setSpecialists] = useState([]);
   const [services, setServices] = useState([]);
+  const [vacations, setVacations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filterSpecialist, setFilterSpecialist] = useState("all");
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [modalOpen, setModalOpen] = useState(false);
   const [floatingModalOpen, setFloatingModalOpen] = useState(false);
   const [clientModalOpen, setClientModalOpen] = useState(false);
+  const [vacationModalOpen, setVacationModalOpen] = useState(false);
   const [modalSpecialistId, setModalSpecialistId] = useState("");
   const [modalStartTime, setModalStartTime] = useState("");
   const [detailAppt, setDetailAppt] = useState(null);
@@ -54,14 +59,16 @@ export default function DailyAgenda() {
     if (!branch) return;
     setLoading(true);
     try {
-      const [a, sp, sv] = await Promise.all([
+      const [a, sp, sv, v] = await Promise.all([
         fetchAppointments({ date, branch_id: branch.id }),
         fetchSpecialists({ branch_id: branch.id }),
         fetchServices({ branch_id: branch.id }),
+        fetchVacations({ date, branch_id: branch.id }),
       ]);
       setAppointments(a);
       setSpecialists(sp);
       setServices(sv);
+      setVacations(v);
     } catch (e) {
       toast.error("Error cargando datos");
     } finally {
@@ -73,6 +80,23 @@ export default function DailyAgenda() {
 
   const findService = (id) => services.find((s) => s.id === id);
   const findSpecialist = (id) => specialists.find((s) => s.id === id);
+
+  const getSpecialistVacation = (spId) => {
+    return vacations.find(
+      (v) => v.specialist_id === spId && v.start_date <= date && v.end_date >= date
+    );
+  };
+
+  const handleCancelVacation = async (vacationId) => {
+    if (!window.confirm("¿Desea cancelar este periodo de vacaciones y reactivar la agenda del especialista?")) return;
+    try {
+      await deleteVacation(vacationId);
+      toast.success("Vacaciones canceladas");
+      load();
+    } catch {
+      toast.error("No se pudo cancelar el periodo de vacaciones");
+    }
+  };
 
   const visibleSpecialists = useMemo(() => {
     if (filterSpecialist === "all") return specialists;
@@ -117,6 +141,11 @@ export default function DailyAgenda() {
   };
 
   const openModal = (specialistId, slotMin) => {
+    const vac = getSpecialistVacation(specialistId);
+    if (vac) {
+      toast.error(`El especialista no está disponible (${vac.reason || "Vacaciones"}).`);
+      return;
+    }
     setModalSpecialistId(specialistId);
     setModalStartTime(minToTime(slotMin));
     setModalOpen(true);
@@ -149,6 +178,14 @@ export default function DailyAgenda() {
         }
         action={
           <div className="flex items-center gap-2">
+            <button
+              data-testid="header-vacation-btn"
+              onClick={() => setVacationModalOpen(true)}
+              className="btn-invert border border-black bg-white text-black px-4 py-3 font-mono-label text-[10px] font-bold hover:bg-neutral-100 flex items-center gap-2 transition-colors"
+            >
+              <Palmtree className="w-3 h-3" strokeWidth={2} />
+              Vacaciones
+            </button>
             <button
               data-testid="header-save-client-btn"
               onClick={() => setClientModalOpen(true)}
@@ -246,37 +283,51 @@ export default function DailyAgenda() {
                   >
                     HORA
                   </th>
-                  {visibleSpecialists.map((sp) => (
-                    <th
-                      key={sp.id}
-                      data-testid={`col-header-${sp.id}`}
-                      className="sticky top-0 z-20 bg-white border-r border-b border-black p-3 text-left min-w-[200px]"
-                    >
-                      <div className="flex items-center gap-2">
-                        {sp.avatar_url ? (
-                          <img
-                            src={sp.avatar_url}
-                            alt=""
-                            className="w-8 h-8 object-cover grayscale border border-black/40"
-                          />
-                        ) : (
-                          <span className="w-8 h-8 bg-neutral-300 border border-black/20 flex items-center justify-center font-mono-label text-[9px] font-bold text-black">
-                            {sp.name.split(" ").map((n) => n[0]).slice(0, 2).join("")}
-                          </span>
-                        )}
-                        <div className="leading-tight">
-                          <div className="font-serif-display text-base text-black">{sp.name}</div>
-                          <div className="font-mono-label text-[9px] font-bold text-neutral-800">
-                            {sp.specialty}
+                  {visibleSpecialists.map((sp) => {
+                    const vac = getSpecialistVacation(sp.id);
+                    return (
+                      <th
+                        key={sp.id}
+                        data-testid={`col-header-${sp.id}`}
+                        className={`sticky top-0 z-20 border-r border-b border-black p-3 text-left min-w-[200px] ${
+                          vac ? "bg-neutral-100" : "bg-white"
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          {sp.avatar_url ? (
+                            <img
+                              src={sp.avatar_url}
+                              alt=""
+                              className="w-8 h-8 object-cover grayscale border border-black/40"
+                            />
+                          ) : (
+                            <span className="w-8 h-8 bg-neutral-300 border border-black/20 flex items-center justify-center font-mono-label text-[9px] font-bold text-black">
+                              {sp.name.split(" ").map((n) => n[0]).slice(0, 2).join("")}
+                            </span>
+                          )}
+                          <div className="leading-tight">
+                            <div className="font-serif-display text-base text-black flex items-center gap-1.5">
+                              {sp.name}
+                              {vac && <Palmtree className="w-3.5 h-3.5 text-black inline shrink-0" />}
+                            </div>
+                            <div className="font-mono-label text-[9px] font-bold text-neutral-800">
+                              {vac ? (
+                                <span className="text-black uppercase font-bold tracking-wider">
+                                  [{vac.reason || "Vacaciones"}]
+                                </span>
+                              ) : (
+                                sp.specialty
+                              )}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    </th>
-                  ))}
+                      </th>
+                    );
+                  })}
                 </tr>
               </thead>
               <tbody>
-                {SLOTS.map((slotMin) => {
+                {SLOTS.map((slotMin, slotIdx) => {
                   const timeLabel = minToTime(slotMin);
                   return (
                   <tr key={slotMin} data-testid={`row-slot-${timeLabel}`}>
@@ -286,6 +337,42 @@ export default function DailyAgenda() {
                       {timeLabel}
                     </td>
                     {visibleSpecialists.map((sp) => {
+                      const vac = getSpecialistVacation(sp.id);
+
+                      if (vac) {
+                        if (slotIdx === 0) {
+                          return (
+                            <td
+                              key={sp.id}
+                              rowSpan={SLOTS.length}
+                              data-testid={`vacation-column-${sp.id}`}
+                              className="border-r border-b border-neutral-300 bg-neutral-100/90 p-4 text-center align-middle relative select-none"
+                            >
+                              <div className="flex flex-col items-center justify-center gap-2 max-w-xs mx-auto p-6 border-2 border-dashed border-neutral-400 bg-white/80">
+                                <Palmtree className="w-8 h-8 text-black" strokeWidth={1.5} />
+                                <div className="font-serif-display text-2xl font-bold text-black uppercase tracking-wider">
+                                  {vac.reason || "De Vacaciones"}
+                                </div>
+                                <div className="font-mono-label text-[10px] font-bold text-neutral-600">
+                                  {vac.start_date} — {vac.end_date}
+                                </div>
+                                <p className="text-xs text-neutral-500 font-medium">
+                                  El especialista no se encuentra disponible en esta fecha.
+                                </p>
+                                <button
+                                  type="button"
+                                  onClick={() => handleCancelVacation(vac.id)}
+                                  className="mt-2 btn-invert border border-black px-3 py-1.5 font-mono-label text-[9px] font-bold hover:bg-black hover:text-white"
+                                >
+                                  Cancelar Vacaciones
+                                </button>
+                              </div>
+                            </td>
+                          );
+                        }
+                        return null;
+                      }
+
                       const cell = grid[sp.id];
                       if (!cell) return null;
                       if (cell.coveredSlots.has(slotMin)) {
@@ -477,6 +564,13 @@ export default function DailyAgenda() {
       <NewClientModal
         open={clientModalOpen}
         onClose={() => setClientModalOpen(false)}
+      />
+
+      <VacationModal
+        open={vacationModalOpen}
+        onClose={() => setVacationModalOpen(false)}
+        onCreated={load}
+        specialists={specialists}
       />
 
       <AppointmentDetailModal
