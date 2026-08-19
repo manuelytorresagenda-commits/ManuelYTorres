@@ -11,7 +11,7 @@ import {
   fetchSpecialists,
   fetchServices,
   fetchVacations,
-  deleteVacation,
+  deleteVacationDay,
   updateAppointmentStatus,
   deleteAppointment,
 } from "../lib/api";
@@ -87,14 +87,14 @@ export default function DailyAgenda() {
     );
   };
 
-  const handleCancelVacation = async (vacationId) => {
-    if (!window.confirm("¿Desea cancelar este periodo de vacaciones y reactivar la agenda del especialista?")) return;
+  const handleCancelVacationForDay = async (vacation) => {
+    if (!window.confirm(`¿Desea habilitar la agenda para el día ${date} manteniendo el resto de las vacaciones?`)) return;
     try {
-      await deleteVacation(vacationId);
-      toast.success("Vacaciones canceladas");
+      await deleteVacationDay(vacation.id, date);
+      toast.success("Día habilitado correctamente");
       load();
-    } catch {
-      toast.error("No se pudo cancelar el periodo de vacaciones");
+    } catch (err) {
+      toast.error(err.response?.data?.detail || "No se pudo cancelar el día de vacaciones");
     }
   };
 
@@ -143,7 +143,7 @@ export default function DailyAgenda() {
   const openModal = (specialistId, slotMin) => {
     const vac = getSpecialistVacation(specialistId);
     if (vac) {
-      toast.error(`El especialista no está disponible (${vac.reason || "Vacaciones"}).`);
+      toast.error(`El especialista no está disponible hoy (${vac.reason || "Vacaciones"}).`);
       return;
     }
     setModalSpecialistId(specialistId);
@@ -305,29 +305,39 @@ export default function DailyAgenda() {
                               {sp.name.split(" ").map((n) => n[0]).slice(0, 2).join("")}
                             </span>
                           )}
-                          <div className="leading-tight">
+                          <div className="leading-tight flex-1">
                             <div className="font-serif-display text-base text-black flex items-center gap-1.5">
                               {sp.name}
-                              {vac && <Palmtree className="w-3.5 h-3.5 text-black inline shrink-0" />}
                             </div>
                             <div className="font-mono-label text-[9px] font-bold text-neutral-800">
-                              {vac ? (
-                                <span className="text-black uppercase font-bold tracking-wider">
-                                  [{vac.reason || "Vacaciones"}]
-                                </span>
-                              ) : (
-                                sp.specialty
-                              )}
+                              {sp.specialty}
                             </div>
                           </div>
                         </div>
+
+                        {/* Pastilla de vacaciones con botón de papelera para cancelar este día puntual */}
+                        {vac && (
+                          <div className="mt-2 flex items-center justify-between bg-neutral-200 border border-black/50 px-2 py-1">
+                            <span className="font-mono-label text-[8px] font-bold uppercase truncate">
+                              🌴 {vac.reason || "Vacaciones"}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleCancelVacationForDay(vac)}
+                              title="Habilitar este día"
+                              className="p-0.5 hover:text-red-600 transition-colors ml-1"
+                            >
+                              <Trash2 className="w-2.5 h-2.5" strokeWidth={2} />
+                            </button>
+                          </div>
+                        )}
                       </th>
                     );
                   })}
                 </tr>
               </thead>
               <tbody>
-                {SLOTS.map((slotMin, slotIdx) => {
+                {SLOTS.map((slotMin) => {
                   const timeLabel = minToTime(slotMin);
                   return (
                   <tr key={slotMin} data-testid={`row-slot-${timeLabel}`}>
@@ -339,38 +349,21 @@ export default function DailyAgenda() {
                     {visibleSpecialists.map((sp) => {
                       const vac = getSpecialistVacation(sp.id);
 
+                      // Si está de vacaciones hoy, celda limpia de bloqueo
                       if (vac) {
-                        if (slotIdx === 0) {
-                          return (
-                            <td
-                              key={sp.id}
-                              rowSpan={SLOTS.length}
-                              data-testid={`vacation-column-${sp.id}`}
-                              className="border-r border-b border-neutral-300 bg-neutral-100/90 p-4 text-center align-middle relative select-none"
-                            >
-                              <div className="flex flex-col items-center justify-center gap-2 max-w-xs mx-auto p-6 border-2 border-dashed border-neutral-400 bg-white/80">
-                                <Palmtree className="w-8 h-8 text-black" strokeWidth={1.5} />
-                                <div className="font-serif-display text-2xl font-bold text-black uppercase tracking-wider">
-                                  {vac.reason || "De Vacaciones"}
-                                </div>
-                                <div className="font-mono-label text-[10px] font-bold text-neutral-600">
-                                  {vac.start_date} — {vac.end_date}
-                                </div>
-                                <p className="text-xs text-neutral-500 font-medium">
-                                  El especialista no se encuentra disponible en esta fecha.
-                                </p>
-                                <button
-                                  type="button"
-                                  onClick={() => handleCancelVacation(vac.id)}
-                                  className="mt-2 btn-invert border border-black px-3 py-1.5 font-mono-label text-[9px] font-bold hover:bg-black hover:text-white"
-                                >
-                                  Cancelar Vacaciones
-                                </button>
-                              </div>
-                            </td>
-                          );
-                        }
-                        return null;
+                        return (
+                          <td
+                            key={sp.id}
+                            className="border-r border-b border-neutral-300 p-1.5 h-10 bg-neutral-100/60 cursor-not-allowed select-none"
+                            title={`${vac.reason || "Vacaciones"} (${vac.start_date} a ${vac.end_date})`}
+                          >
+                            <div className="w-full h-full border border-dashed border-neutral-300 flex items-center justify-center">
+                              <span className="font-mono-label text-[8px] font-bold text-neutral-400 uppercase tracking-wider">
+                                NO DISPONIBLE
+                              </span>
+                            </div>
+                          </td>
+                        );
                       }
 
                       const cell = grid[sp.id];
