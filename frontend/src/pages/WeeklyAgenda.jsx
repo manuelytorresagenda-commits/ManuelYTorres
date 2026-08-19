@@ -11,6 +11,7 @@ import {
   fetchSpecialists,
   fetchServices,
   fetchVacations,
+  deleteVacation,
   updateAppointmentStatus,
   deleteAppointment,
 } from "../lib/api";
@@ -101,6 +102,17 @@ export default function WeeklyAgenda() {
     return vacations.filter((v) => v.start_date <= dateStr && v.end_date >= dateStr);
   };
 
+  const handleCancelVacation = async (vacationId) => {
+    if (!window.confirm("¿Desea cancelar este periodo de vacaciones y habilitar la agenda?")) return;
+    try {
+      await deleteVacation(vacationId);
+      toast.success("Vacaciones canceladas");
+      load();
+    } catch {
+      toast.error("No se pudo cancelar el periodo de vacaciones");
+    }
+  };
+
   const grid = useMemo(() => {
     const result = {};
     days.forEach((d) => {
@@ -146,7 +158,7 @@ export default function WeeklyAgenda() {
     if (filterSpecialist !== "all") {
       const vac = isSpecialistOnVacation(filterSpecialist, dateStr);
       if (vac) {
-        toast.error(`El especialista está no disponible (${vac.reason || "Vacaciones"}).`);
+        toast.error(`El especialista no está disponible (${vac.reason || "Vacaciones"}).`);
         return;
       }
     }
@@ -251,17 +263,34 @@ export default function WeeklyAgenda() {
                     const isToday = d.toDateString() === new Date().toDateString();
                     const ds = d.toISOString().slice(0, 10);
                     const dayVacs = getDayVacations(ds);
-                    const hasVacationFiltered = filterSpecialist !== "all" && isSpecialistOnVacation(filterSpecialist, ds);
+                    const spVac = filterSpecialist !== "all" ? isSpecialistOnVacation(filterSpecialist, ds) : null;
 
                     return (
                       <th key={i} className={`sticky top-0 z-20 border-b border-r border-black p-3 text-left min-w-[150px] ${
-                        isToday ? "bg-black text-white" : hasVacationFiltered ? "bg-neutral-100 text-black" : "bg-white text-black"
+                        isToday ? "bg-black text-white" : spVac ? "bg-neutral-100 text-black" : "bg-white text-black"
                       }`}>
                         <div className="font-mono-label text-[10px] font-bold opacity-80 flex items-center justify-between">
                           <span>{DAYS_ES[i]}</span>
-                          {hasVacationFiltered && <Palmtree className="w-3 h-3 text-black inline" />}
                         </div>
                         <div className="font-serif-display text-2xl font-bold leading-none mt-1">{d.getDate()}</div>
+                        
+                        {/* Vacation pill in header */}
+                        {spVac && (
+                          <div className="mt-2 flex items-center justify-between bg-neutral-200 border border-black/40 px-2 py-1">
+                            <span className="font-mono-label text-[8px] font-bold uppercase truncate">
+                              🌴 {spVac.reason || "Vacaciones"}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleCancelVacation(spVac.id)}
+                              title="Cancelar vacaciones"
+                              className="p-0.5 hover:text-red-600 transition-colors ml-1"
+                            >
+                              <Trash2 className="w-2.5 h-2.5" strokeWidth={2} />
+                            </button>
+                          </div>
+                        )}
+
                         {dayVacs.length > 0 && filterSpecialist === "all" && (
                           <div className="font-mono-label text-[8px] font-bold text-neutral-600 truncate mt-1">
                             🌴 {dayVacs.length} Ausente{dayVacs.length > 1 ? "s" : ""}
@@ -273,7 +302,7 @@ export default function WeeklyAgenda() {
                 </tr>
               </thead>
               <tbody>
-                {SLOTS.map((slotMin, slotIdx) => {
+                {SLOTS.map((slotMin) => {
                   const timeLabel = minToTime(slotMin);
                   return (
                   <tr key={slotMin}>
@@ -282,32 +311,23 @@ export default function WeeklyAgenda() {
                     </td>
                     {days.map((d, i) => {
                       const ds = d.toISOString().slice(0, 10);
+                      const spVac = filterSpecialist !== "all" ? isSpecialistOnVacation(filterSpecialist, ds) : null;
 
-                      // Si se filtra un especialista y está de vacaciones ese día
-                      if (filterSpecialist !== "all") {
-                        const vac = isSpecialistOnVacation(filterSpecialist, ds);
-                        if (vac) {
-                          if (slotIdx === 0) {
-                            return (
-                              <td
-                                key={i}
-                                rowSpan={SLOTS.length}
-                                className="border-b border-r border-neutral-300 bg-neutral-100/90 p-4 text-center align-middle"
-                              >
-                                <div className="flex flex-col items-center justify-center gap-1.5 p-4 border-2 border-dashed border-neutral-400 bg-white/80">
-                                  <Palmtree className="w-6 h-6 text-black" strokeWidth={1.5} />
-                                  <div className="font-serif-display text-lg font-bold text-black uppercase">
-                                    {vac.reason || "Vacaciones"}
-                                  </div>
-                                  <div className="font-mono-label text-[8px] font-bold text-neutral-600">
-                                    {vac.start_date} — {vac.end_date}
-                                  </div>
-                                </div>
-                              </td>
-                            );
-                          }
-                          return null;
-                        }
+                      // Si el especialista filtrado está de vacaciones este día
+                      if (spVac) {
+                        return (
+                          <td
+                            key={i}
+                            className="border-b border-r border-neutral-300 p-1.5 h-10 bg-neutral-100/60 cursor-not-allowed select-none"
+                            title={`${spVac.reason || "Vacaciones"} (${spVac.start_date} a ${spVac.end_date})`}
+                          >
+                            <div className="w-full h-full border border-dashed border-neutral-300 flex items-center justify-center">
+                              <span className="font-mono-label text-[8px] font-bold text-neutral-400 uppercase tracking-wider">
+                                NO DISPONIBLE
+                              </span>
+                            </div>
+                          </td>
+                        );
                       }
 
                       const bucket = grid[ds];
