@@ -52,7 +52,9 @@ export const deleteAppointment = (id) => api.delete(`/appointments/${id}`).then(
 export const fetchClients = (q) => api.get("/clients", { params: q ? { q } : {} }).then((r) => r.data);
 export const createClient = (data) => api.post("/clients", data).then((r) => r.data);
 
-// Vacaciones / Ausencias (NUEVO)
+// Vacaciones / Ausencias
 export const fetchVacations = (params = {}) => api.get("/vacations", { params }).then((r) => r.data);
 export const createVacation = (data) => api.post("/vacations", data).then((r) => r.data);
 export const deleteVacation = (id) => api.delete(`/vacations/${id}`).then((r) => r.data);
+export const deleteVacationDay = (id, date) =>
+  api.delete(`/vacations/${id}/single-day`, { params: { date } }).then((r) => r.data);
