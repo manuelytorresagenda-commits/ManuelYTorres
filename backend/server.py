@@ -206,6 +206,24 @@ class AppointmentReschedule(BaseModel):
     start_time: str
 
 
+class Vacation(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    specialist_id: str
+    specialist_name: Optional[str] = ""
+    start_date: str  # "YYYY-MM-DD"
+    end_date: str    # "YYYY-MM-DD"
+    reason: Optional[str] = "Vacaciones"
+    branch_id: Optional[str] = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class VacationCreate(BaseModel):
+    specialist_id: str
+    start_date: str
+    end_date: str
+    reason: Optional[str] = "Vacaciones"
+
+
 class PinVerify(BaseModel):
     pin: str
 
@@ -530,7 +548,6 @@ async def create_client(payload: ClientCreate):
     tiktok_clean = _normalize_handle(payload.tiktok)
     birthday_clean = _normalize_birthday(payload.birthday)
 
-    # Upsert o creación con _upsert_client existente
     await _upsert_client(
         name=name_clean,
         phone=phone_clean,
@@ -539,7 +556,6 @@ async def create_client(payload: ClientCreate):
         birthday=birthday_clean,
     )
 
-    # Devolvemos el documento creado o actualizado
     query = {"name": {"$regex": f"^{re.escape(name_clean)}$", "$options": "i"}}
     if phone_clean:
         query["phone"] = phone_clean
@@ -572,6 +588,77 @@ async def list_clients(q: Optional[str] = None, limit: int = 20):
     return docs[: max(1, min(limit, 100))]
 
 
+# ----------------------- VACATIONS (NUEVO) -----------------------
+@api_router.post("/vacations", response_model=Vacation)
+async def create_vacation(payload: VacationCreate):
+    _validate_date(payload.start_date)
+    _validate_date(payload.end_date)
+    
+    if payload.start_date > payload.end_date:
+        raise HTTPException(400, "La fecha de inicio no puede ser posterior a la de fin")
+
+    specialist = await db.specialists.find_one({"id": payload.specialist_id}, {"_id": 0})
+    if not specialist:
+        raise HTTPException(400, "Especialista no encontrado")
+
+    vacation = Vacation(
+        specialist_id=payload.specialist_id,
+        specialist_name=specialist.get("name", ""),
+        start_date=payload.start_date,
+        end_date=payload.end_date,
+        reason=payload.reason or "Vacaciones",
+        branch_id=specialist.get("branch_id"),
+    )
+    doc = vacation.model_dump()
+    doc["created_at"] = doc["created_at"].isoformat()
+    await db.vacations.insert_one(doc)
+    return vacation
+
+
+@api_router.get("/vacations", response_model=List[Vacation])
+async def list_vacations(
+    date: Optional[str] = None,
+    week_start: Optional[str] = None,
+    specialist_id: Optional[str] = None,
+    branch_id: Optional[str] = None
+):
+    q = {}
+    if branch_id:
+        q["branch_id"] = branch_id
+    if specialist_id:
+        q["specialist_id"] = specialist_id
+
+    if date:
+        _validate_date(date)
+        # Vacaciones que incluyan la fecha dada
+        q["start_date"] = {"$lte": date}
+        q["end_date"] = {"$gte": date}
+    elif week_start:
+        _validate_date(week_start)
+        start_d = datetime.strptime(week_start, "%Y-%m-%d")
+        week_end = (start_d + timedelta(days=6)).strftime("%Y-%m-%d")
+        # Vacaciones que solapen con la semana
+        q["start_date"] = {"$lte": week_end}
+        q["end_date"] = {"$gte": week_start}
+
+    docs = await db.vacations.find(q, {"_id": 0}).to_list(500)
+    for d in docs:
+        if isinstance(d.get("created_at"), str):
+            try:
+                d["created_at"] = datetime.fromisoformat(d["created_at"])
+            except ValueError:
+                d["created_at"] = datetime.now(timezone.utc)
+    return docs
+
+
+@api_router.delete("/vacations/{vacation_id}")
+async def delete_vacation(vacation_id: str):
+    res = await db.vacations.delete_one({"id": vacation_id})
+    if res.deleted_count == 0:
+        raise HTTPException(404, "Registro de vacaciones no encontrado")
+    return {"success": True}
+
+
 # ----------------------- APPOINTMENTS -----------------------
 @api_router.post("/appointments", response_model=Appointment)
 async def create_appointment(payload: AppointmentCreate):
@@ -583,6 +670,16 @@ async def create_appointment(payload: AppointmentCreate):
     specialist = await db.specialists.find_one({"id": payload.specialist_id}, {"_id": 0})
     if not specialist:
         raise HTTPException(400, "Especialista no encontrado")
+
+    # Verificar si el especialista está de vacaciones en esa fecha
+    vacation = await db.vacations.find_one({
+        "specialist_id": payload.specialist_id,
+        "start_date": {"$lte": payload.date},
+        "end_date": {"$gte": payload.date}
+    }, {"_id": 0})
+    if vacation:
+        reason = vacation.get("reason") or "Vacaciones"
+        raise HTTPException(400, f"{specialist.get('name', 'El especialista')} no está disponible el {payload.date} ({reason}).")
 
     _validate_time(specialist.get("start_time", ""), "turno especialista")
     _validate_time(specialist.get("end_time", ""), "turno especialista")
@@ -796,6 +893,16 @@ async def reschedule_appointment(appt_id: str, payload: AppointmentReschedule):
     specialist = await db.specialists.find_one({"id": new_specialist_id}, {"_id": 0})
     if not specialist:
         raise HTTPException(400, "Especialista no encontrado")
+
+    # Verificar si está de vacaciones
+    vacation = await db.vacations.find_one({
+        "specialist_id": new_specialist_id,
+        "start_date": {"$lte": payload.date},
+        "end_date": {"$gte": payload.date}
+    }, {"_id": 0})
+    if vacation:
+        reason = vacation.get("reason") or "Vacaciones"
+        raise HTTPException(400, f"{specialist.get('name', 'El especialista')} no está disponible el {payload.date} ({reason}).")
 
     _validate_time(specialist.get("start_time", ""), "turno especialista")
     _validate_time(specialist.get("end_time", ""), "turno especialista")
@@ -1046,6 +1153,9 @@ async def on_startup():
         await db.branches.create_index("id", unique=True)
         await db.clients.create_index("phone")
         await db.clients.create_index("name")
+        await db.vacations.create_index([("specialist_id", 1), ("start_date", 1), ("end_date", 1)])
+        await db.vacations.create_index([("branch_id", 1), ("start_date", 1), ("end_date", 1)])
+        await db.vacations.create_index("id", unique=True)
         logger.info("Indexes ensured")
     except Exception as e:
         logger.error(f"Index creation failed: {e}")
