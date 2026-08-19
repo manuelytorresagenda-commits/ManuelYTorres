@@ -5,15 +5,17 @@ import NewAppointmentModal from "../components/NewAppointmentModal";
 import FloatingAppointmentModal from "../components/FloatingAppointmentModal";
 import AppointmentDetailModal from "../components/AppointmentDetailModal";
 import NewClientModal from "../components/NewClientModal";
+import VacationModal from "../components/VacationModal";
 import {
   fetchAppointments,
   fetchSpecialists,
   fetchServices,
+  fetchVacations,
   updateAppointmentStatus,
   deleteAppointment,
 } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
-import { ChevronLeft, ChevronRight, Plus, Wind, UserPlus, Trash2, Play, CheckCircle2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, Wind, UserPlus, Trash2, Play, CheckCircle2, Palmtree } from "lucide-react";
 import { toast } from "sonner";
 import { SLOTS, minToTime, buildOverlapGrid } from "../lib/scheduling";
 
@@ -33,11 +35,13 @@ export default function WeeklyAgenda() {
   const [appointments, setAppointments] = useState([]);
   const [specialists, setSpecialists] = useState([]);
   const [services, setServices] = useState([]);
+  const [vacations, setVacations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filterSpecialist, setFilterSpecialist] = useState("all");
   const [modalOpen, setModalOpen] = useState(false);
   const [floatingModalOpen, setFloatingModalOpen] = useState(false);
   const [clientModalOpen, setClientModalOpen] = useState(false);
+  const [vacationModalOpen, setVacationModalOpen] = useState(false);
   const [modalSpecialistId, setModalSpecialistId] = useState("");
   const [modalStartTime, setModalStartTime] = useState("");
   const [modalDate, setModalDate] = useState("");
@@ -57,14 +61,16 @@ export default function WeeklyAgenda() {
     setLoading(true);
     try {
       const ws = weekStart.toISOString().slice(0, 10);
-      const [a, sp, sv] = await Promise.all([
+      const [a, sp, sv, v] = await Promise.all([
         fetchAppointments({ week_start: ws, branch_id: branch.id }),
         fetchSpecialists({ branch_id: branch.id }),
         fetchServices({ branch_id: branch.id }),
+        fetchVacations({ week_start: ws, branch_id: branch.id }),
       ]);
       setAppointments(a);
       setSpecialists(sp);
       setServices(sv);
+      setVacations(v);
     } catch { 
       toast.error("Error cargando datos"); 
     } finally { 
@@ -84,6 +90,16 @@ export default function WeeklyAgenda() {
 
   const findSp = (id) => specialists.find((s) => s.id === id);
   const findSv = (id) => services.find((s) => s.id === id);
+
+  const isSpecialistOnVacation = (spId, dateStr) => {
+    return vacations.find(
+      (v) => v.specialist_id === spId && v.start_date <= dateStr && v.end_date >= dateStr
+    );
+  };
+
+  const getDayVacations = (dateStr) => {
+    return vacations.filter((v) => v.start_date <= dateStr && v.end_date >= dateStr);
+  };
 
   const grid = useMemo(() => {
     const result = {};
@@ -127,6 +143,13 @@ export default function WeeklyAgenda() {
   };
 
   const openModalForCell = (dateStr, slotMin) => {
+    if (filterSpecialist !== "all") {
+      const vac = isSpecialistOnVacation(filterSpecialist, dateStr);
+      if (vac) {
+        toast.error(`El especialista está no disponible (${vac.reason || "Vacaciones"}).`);
+        return;
+      }
+    }
     setModalDate(dateStr);
     setModalStartTime(minToTime(slotMin));
     setModalSpecialistId(filterSpecialist !== "all" ? filterSpecialist : "");
@@ -149,6 +172,14 @@ export default function WeeklyAgenda() {
         description="Vista calendario de toda la semana. Navegue entre semanas con las flechas."
         action={
           <div className="flex items-center gap-2">
+            <button
+              data-testid="header-vacation-btn"
+              onClick={() => setVacationModalOpen(true)}
+              className="btn-invert border border-black bg-white text-black px-4 py-3 font-mono-label text-[10px] font-bold hover:bg-neutral-100 flex items-center gap-2 transition-colors"
+            >
+              <Palmtree className="w-3 h-3" strokeWidth={2} />
+              Vacaciones
+            </button>
             <button
               data-testid="header-save-client-btn"
               onClick={() => setClientModalOpen(true)}
@@ -218,17 +249,31 @@ export default function WeeklyAgenda() {
                   </th>
                   {days.map((d, i) => {
                     const isToday = d.toDateString() === new Date().toDateString();
+                    const ds = d.toISOString().slice(0, 10);
+                    const dayVacs = getDayVacations(ds);
+                    const hasVacationFiltered = filterSpecialist !== "all" && isSpecialistOnVacation(filterSpecialist, ds);
+
                     return (
-                      <th key={i} className={`sticky top-0 z-20 border-b border-r border-black p-3 text-left min-w-[150px] ${isToday ? "bg-black text-white" : "bg-white text-black"}`}>
-                        <div className="font-mono-label text-[10px] font-bold opacity-80">{DAYS_ES[i]}</div>
+                      <th key={i} className={`sticky top-0 z-20 border-b border-r border-black p-3 text-left min-w-[150px] ${
+                        isToday ? "bg-black text-white" : hasVacationFiltered ? "bg-neutral-100 text-black" : "bg-white text-black"
+                      }`}>
+                        <div className="font-mono-label text-[10px] font-bold opacity-80 flex items-center justify-between">
+                          <span>{DAYS_ES[i]}</span>
+                          {hasVacationFiltered && <Palmtree className="w-3 h-3 text-black inline" />}
+                        </div>
                         <div className="font-serif-display text-2xl font-bold leading-none mt-1">{d.getDate()}</div>
+                        {dayVacs.length > 0 && filterSpecialist === "all" && (
+                          <div className="font-mono-label text-[8px] font-bold text-neutral-600 truncate mt-1">
+                            🌴 {dayVacs.length} Ausente{dayVacs.length > 1 ? "s" : ""}
+                          </div>
+                        )}
                       </th>
                     );
                   })}
                 </tr>
               </thead>
               <tbody>
-                {SLOTS.map((slotMin) => {
+                {SLOTS.map((slotMin, slotIdx) => {
                   const timeLabel = minToTime(slotMin);
                   return (
                   <tr key={slotMin}>
@@ -237,6 +282,34 @@ export default function WeeklyAgenda() {
                     </td>
                     {days.map((d, i) => {
                       const ds = d.toISOString().slice(0, 10);
+
+                      // Si se filtra un especialista y está de vacaciones ese día
+                      if (filterSpecialist !== "all") {
+                        const vac = isSpecialistOnVacation(filterSpecialist, ds);
+                        if (vac) {
+                          if (slotIdx === 0) {
+                            return (
+                              <td
+                                key={i}
+                                rowSpan={SLOTS.length}
+                                className="border-b border-r border-neutral-300 bg-neutral-100/90 p-4 text-center align-middle"
+                              >
+                                <div className="flex flex-col items-center justify-center gap-1.5 p-4 border-2 border-dashed border-neutral-400 bg-white/80">
+                                  <Palmtree className="w-6 h-6 text-black" strokeWidth={1.5} />
+                                  <div className="font-serif-display text-lg font-bold text-black uppercase">
+                                    {vac.reason || "Vacaciones"}
+                                  </div>
+                                  <div className="font-mono-label text-[8px] font-bold text-neutral-600">
+                                    {vac.start_date} — {vac.end_date}
+                                  </div>
+                                </div>
+                              </td>
+                            );
+                          }
+                          return null;
+                        }
+                      }
+
                       const bucket = grid[ds];
                       if (!bucket) {
                         return (
@@ -408,6 +481,13 @@ export default function WeeklyAgenda() {
       <NewClientModal
         open={clientModalOpen}
         onClose={() => setClientModalOpen(false)}
+      />
+
+      <VacationModal
+        open={vacationModalOpen}
+        onClose={() => setVacationModalOpen(false)}
+        onCreated={load}
+        specialists={specialists}
       />
 
       <AppointmentDetailModal
