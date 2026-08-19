@@ -11,7 +11,7 @@ import {
   fetchSpecialists,
   fetchServices,
   fetchVacations,
-  deleteVacation,
+  deleteVacationDay,
   updateAppointmentStatus,
   deleteAppointment,
 } from "../lib/api";
@@ -102,14 +102,14 @@ export default function WeeklyAgenda() {
     return vacations.filter((v) => v.start_date <= dateStr && v.end_date >= dateStr);
   };
 
-  const handleCancelVacation = async (vacationId) => {
-    if (!window.confirm("¿Desea cancelar este periodo de vacaciones y habilitar la agenda?")) return;
+  const handleCancelVacationForDay = async (vacation, dateStr) => {
+    if (!window.confirm(`¿Desea habilitar la agenda para el día ${dateStr} manteniendo el resto de las vacaciones?`)) return;
     try {
-      await deleteVacation(vacationId);
-      toast.success("Vacaciones canceladas");
+      await deleteVacationDay(vacation.id, dateStr);
+      toast.success("Día habilitado correctamente");
       load();
-    } catch {
-      toast.error("No se pudo cancelar el periodo de vacaciones");
+    } catch (err) {
+      toast.error(err.response?.data?.detail || "No se pudo cancelar el día de vacaciones");
     }
   };
 
@@ -274,17 +274,17 @@ export default function WeeklyAgenda() {
                         </div>
                         <div className="font-serif-display text-2xl font-bold leading-none mt-1">{d.getDate()}</div>
                         
-                        {/* Vacation pill in header */}
+                        {/* Pastilla en cabecera con botón de papelera para cancelar este día puntual */}
                         {spVac && (
                           <div className="mt-2 flex items-center justify-between bg-neutral-200 border border-black/40 px-2 py-1">
-                            <span className="font-mono-label text-[8px] font-bold uppercase truncate">
+                            <span className="font-mono-label text-[8px] font-bold uppercase truncate text-black">
                               🌴 {spVac.reason || "Vacaciones"}
                             </span>
                             <button
                               type="button"
-                              onClick={() => handleCancelVacation(spVac.id)}
-                              title="Cancelar vacaciones"
-                              className="p-0.5 hover:text-red-600 transition-colors ml-1"
+                              onClick={() => handleCancelVacationForDay(spVac, ds)}
+                              title={`Habilitar el ${ds}`}
+                              className="p-0.5 hover:text-red-600 transition-colors ml-1 text-black"
                             >
                               <Trash2 className="w-2.5 h-2.5" strokeWidth={2} />
                             </button>
@@ -313,7 +313,7 @@ export default function WeeklyAgenda() {
                       const ds = d.toISOString().slice(0, 10);
                       const spVac = filterSpecialist !== "all" ? isSpecialistOnVacation(filterSpecialist, ds) : null;
 
-                      // Si el especialista filtrado está de vacaciones este día
+                      // Si el especialista filtrado está de vacaciones este día puntual
                       if (spVac) {
                         return (
                           <td
