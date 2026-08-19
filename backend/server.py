@@ -588,7 +588,7 @@ async def list_clients(q: Optional[str] = None, limit: int = 20):
     return docs[: max(1, min(limit, 100))]
 
 
-# ----------------------- VACATIONS (NUEVO) -----------------------
+# ----------------------- VACATIONS -----------------------
 @api_router.post("/vacations", response_model=Vacation)
 async def create_vacation(payload: VacationCreate):
     _validate_date(payload.start_date)
@@ -630,14 +630,12 @@ async def list_vacations(
 
     if date:
         _validate_date(date)
-        # Vacaciones que incluyan la fecha dada
         q["start_date"] = {"$lte": date}
         q["end_date"] = {"$gte": date}
     elif week_start:
         _validate_date(week_start)
         start_d = datetime.strptime(week_start, "%Y-%m-%d")
         week_end = (start_d + timedelta(days=6)).strftime("%Y-%m-%d")
-        # Vacaciones que solapen con la semana
         q["start_date"] = {"$lte": week_end}
         q["end_date"] = {"$gte": week_start}
 
@@ -657,6 +655,60 @@ async def delete_vacation(vacation_id: str):
     if res.deleted_count == 0:
         raise HTTPException(404, "Registro de vacaciones no encontrado")
     return {"success": True}
+
+
+@api_router.delete("/vacations/{vacation_id}/single-day")
+async def cancel_vacation_single_day(vacation_id: str, date: str):
+    _validate_date(date)
+    vac = await db.vacations.find_one({"id": vacation_id}, {"_id": 0})
+    if not vac:
+        raise HTTPException(404, "Registro de vacaciones no encontrado")
+    
+    start_d = datetime.strptime(vac["start_date"], "%Y-%m-%d").date()
+    end_d = datetime.strptime(vac["end_date"], "%Y-%m-%d").date()
+    target_d = datetime.strptime(date, "%Y-%m-%d").date()
+
+    if target_d < start_d or target_d > end_d:
+        raise HTTPException(400, "La fecha indicada no cae dentro de este periodo de vacaciones")
+
+    # Caso 1: Vacación de 1 solo día -> se borra el registro completo
+    if start_d == end_d:
+        await db.vacations.delete_one({"id": vacation_id})
+        return {"success": True, "message": "Vacación eliminada"}
+
+    # Caso 2: Se cancela el primer día del rango -> mover start_date 1 día adelante
+    if target_d == start_d:
+        new_start = (start_d + timedelta(days=1)).strftime("%Y-%m-%d")
+        await db.vacations.update_one({"id": vacation_id}, {"$set": {"start_date": new_start}})
+        return {"success": True, "message": "Día inicial removido del rango"}
+
+    # Caso 3: Se cancela el último día del rango -> mover end_date 1 día atrás
+    if target_d == end_d:
+        new_end = (end_d - timedelta(days=1)).strftime("%Y-%m-%d")
+        await db.vacations.update_one({"id": vacation_id}, {"$set": {"end_date": new_end}})
+        return {"success": True, "message": "Día final removido del rango"}
+
+    # Caso 4: Se cancela un día intermedio -> Dividir en dos rangos
+    first_end = (target_d - timedelta(days=1)).strftime("%Y-%m-%d")
+    second_start = (target_d + timedelta(days=1)).strftime("%Y-%m-%d")
+
+    # Acortar el actual
+    await db.vacations.update_one({"id": vacation_id}, {"$set": {"end_date": first_end}})
+
+    # Insertar el nuevo tramo posterior
+    new_vac = Vacation(
+        specialist_id=vac["specialist_id"],
+        specialist_name=vac.get("specialist_name", ""),
+        start_date=second_start,
+        end_date=vac["end_date"],
+        reason=vac.get("reason", "Vacaciones"),
+        branch_id=vac.get("branch_id"),
+    )
+    new_doc = new_vac.model_dump()
+    new_doc["created_at"] = new_doc["created_at"].isoformat()
+    await db.vacations.insert_one(new_doc)
+
+    return {"success": True, "message": "Día intermedio removido y periodo dividido"}
 
 
 # ----------------------- APPOINTMENTS -----------------------
