@@ -6,17 +6,20 @@ import FloatingAppointmentModal from "../components/FloatingAppointmentModal";
 import AppointmentDetailModal from "../components/AppointmentDetailModal";
 import NewClientModal from "../components/NewClientModal";
 import VacationModal from "../components/VacationModal";
+import CoverageModal from "../components/CoverageModal";
 import {
   fetchAppointments,
   fetchSpecialists,
   fetchServices,
   fetchVacations,
+  fetchCoverages,
+  deleteCoverage,
   deleteVacationDay,
   updateAppointmentStatus,
   deleteAppointment,
 } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
-import { Plus, Trash2, Play, CheckCircle2, Calendar, Wind, UserPlus, Palmtree } from "lucide-react";
+import { Plus, Trash2, Play, CheckCircle2, Calendar, Wind, UserPlus, Palmtree, Users } from "lucide-react";
 import { toast } from "sonner";
 import { SLOTS, timeToMin, minToTime, buildOverlapGrid } from "../lib/scheduling";
 
@@ -41,8 +44,10 @@ const FLOATING_STYLES = {
 export default function DailyAgenda() {
   const [appointments, setAppointments] = useState([]);
   const [specialists, setSpecialists] = useState([]);
+  const [allSpecialistsList, setAllSpecialistsList] = useState([]);
   const [services, setServices] = useState([]);
   const [vacations, setVacations] = useState([]);
+  const [coverages, setCoverages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filterSpecialist, setFilterSpecialist] = useState("all");
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
@@ -50,6 +55,7 @@ export default function DailyAgenda() {
   const [floatingModalOpen, setFloatingModalOpen] = useState(false);
   const [clientModalOpen, setClientModalOpen] = useState(false);
   const [vacationModalOpen, setVacationModalOpen] = useState(false);
+  const [coverageModalOpen, setCoverageModalOpen] = useState(false);
   const [modalSpecialistId, setModalSpecialistId] = useState("");
   const [modalStartTime, setModalStartTime] = useState("");
   const [detailAppt, setDetailAppt] = useState(null);
@@ -59,16 +65,20 @@ export default function DailyAgenda() {
     if (!branch) return;
     setLoading(true);
     try {
-      const [a, sp, sv, v] = await Promise.all([
+      const [a, sp, allSp, sv, v, cov] = await Promise.all([
         fetchAppointments({ date, branch_id: branch.id }),
         fetchSpecialists({ branch_id: branch.id }),
+        fetchSpecialists(), // todos los especialistas para mapear nombres de apoyos internos
         fetchServices({ branch_id: branch.id }),
         fetchVacations({ date, branch_id: branch.id }),
+        fetchCoverages({ date, target_branch_id: branch.id }),
       ]);
       setAppointments(a);
       setSpecialists(sp);
+      setAllSpecialistsList(allSp);
       setServices(sv);
       setVacations(v);
+      setCoverages(cov);
     } catch (e) {
       toast.error("Error cargando datos");
     } finally {
@@ -78,8 +88,38 @@ export default function DailyAgenda() {
 
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [branch, date]);
 
+  // Consolidar especialistas de planta + apoyos/invitados activos en esta fecha
+  const activeSpecialistsList = useMemo(() => {
+    const list = [...specialists];
+    coverages.forEach((c) => {
+      if (c.is_guest) {
+        list.push({
+          id: c.id,
+          name: c.guest_name,
+          specialty: c.specialty || "Invitada",
+          start_time: c.start_time || "09:00",
+          end_time: c.end_time || "18:00",
+          is_coverage: true,
+          coverage_id: c.id,
+          reason: c.reason,
+        });
+      } else if (c.specialist_id) {
+        const found = allSpecialistsList.find((s) => s.id === c.specialist_id);
+        if (found && !list.some((s) => s.id === found.id)) {
+          list.push({
+            ...found,
+            is_coverage: true,
+            coverage_id: c.id,
+            reason: c.reason,
+          });
+        }
+      }
+    });
+    return list;
+  }, [specialists, coverages, allSpecialistsList]);
+
   const findService = (id) => services.find((s) => s.id === id);
-  const findSpecialist = (id) => specialists.find((s) => s.id === id);
+  const findSpecialist = (id) => activeSpecialistsList.find((s) => s.id === id) || allSpecialistsList.find((s) => s.id === id);
 
   const getSpecialistVacation = (spId) => {
     return vacations.find(
@@ -98,10 +138,21 @@ export default function DailyAgenda() {
     }
   };
 
+  const handleDeleteCoverage = async (coverageId, name) => {
+    if (!window.confirm(`¿Desea finalizar el apoyo/invitación de ${name}?`)) return;
+    try {
+      await deleteCoverage(coverageId);
+      toast.success("Apoyo finalizado");
+      load();
+    } catch {
+      toast.error("No se pudo eliminar el apoyo");
+    }
+  };
+
   const visibleSpecialists = useMemo(() => {
-    if (filterSpecialist === "all") return specialists;
-    return specialists.filter((s) => s.id === filterSpecialist);
-  }, [specialists, filterSpecialist]);
+    if (filterSpecialist === "all") return activeSpecialistsList;
+    return activeSpecialistsList.filter((s) => s.id === filterSpecialist);
+  }, [activeSpecialistsList, filterSpecialist]);
 
   const filteredAppointments = useMemo(() => {
     if (filterSpecialist === "all") return appointments;
@@ -163,7 +214,7 @@ export default function DailyAgenda() {
     finalizadas: filteredAppointments.filter((a) => a.status === "Finalizada").length,
   };
 
-  const activeSpecialist = specialists.find((s) => s.id === filterSpecialist);
+  const activeSpecialist = activeSpecialistsList.find((s) => s.id === filterSpecialist);
 
   return (
     <div data-testid="daily-agenda-page">
@@ -178,6 +229,14 @@ export default function DailyAgenda() {
         }
         action={
           <div className="flex items-center gap-2">
+            <button
+              data-testid="header-coverage-btn"
+              onClick={() => setCoverageModalOpen(true)}
+              className="btn-invert border border-black bg-white text-black px-4 py-3 font-mono-label text-[10px] font-bold hover:bg-neutral-100 flex items-center gap-2 transition-colors"
+            >
+              <Users className="w-3 h-3" strokeWidth={2} />
+              Apoyo / Invitado
+            </button>
             <button
               data-testid="header-vacation-btn"
               onClick={() => setVacationModalOpen(true)}
@@ -215,7 +274,7 @@ export default function DailyAgenda() {
       />
 
       <SpecialistFilter
-        specialists={specialists}
+        specialists={activeSpecialistsList}
         value={filterSpecialist}
         onChange={setFilterSpecialist}
       />
@@ -290,7 +349,7 @@ export default function DailyAgenda() {
                         key={sp.id}
                         data-testid={`col-header-${sp.id}`}
                         className={`sticky top-0 z-20 border-r border-b border-black p-3 text-left min-w-[200px] ${
-                          vac ? "bg-neutral-100" : "bg-white"
+                          vac ? "bg-neutral-100" : sp.is_coverage ? "bg-neutral-50" : "bg-white"
                         }`}
                       >
                         <div className="flex items-center gap-2">
@@ -308,9 +367,24 @@ export default function DailyAgenda() {
                           <div className="leading-tight flex-1">
                             <div className="font-serif-display text-base text-black flex items-center gap-1.5">
                               {sp.name}
+                              {sp.is_coverage && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteCoverage(sp.coverage_id, sp.name)}
+                                  title="Finalizar apoyo"
+                                  className="text-neutral-400 hover:text-red-600 transition-colors ml-auto"
+                                >
+                                  <Trash2 className="w-2.5 h-2.5" />
+                                </button>
+                              )}
                             </div>
-                            <div className="font-mono-label text-[9px] font-bold text-neutral-800">
-                              {sp.specialty}
+                            <div className="font-mono-label text-[9px] font-bold text-neutral-800 flex items-center gap-1">
+                              {sp.is_coverage ? (
+                                <span className="bg-black text-white px-1 py-0.2 text-[8px] uppercase">
+                                  {sp.reason || "Apoyo"}
+                                </span>
+                              ) : null}
+                              <span>{sp.specialty}</span>
                             </div>
                           </div>
                         </div>
@@ -501,8 +575,8 @@ export default function DailyAgenda() {
                           className="border-r border-b border-neutral-300 p-2 h-10"
                         >
                           {(() => {
-                            const shiftStart = timeToMin(sp.start_time);
-                            const shiftEnd = timeToMin(sp.end_time);
+                            const shiftStart = timeToMin(sp.start_time || "09:00");
+                            const shiftEnd = timeToMin(sp.end_time || "18:00");
                             const outOfShift = slotMin < shiftStart || slotMin >= shiftEnd;
                             if (outOfShift) {
                               return (
@@ -541,7 +615,7 @@ export default function DailyAgenda() {
         open={modalOpen}
         onClose={() => setModalOpen(false)}
         onCreated={load}
-        specialists={specialists}
+        specialists={activeSpecialistsList}
         specialistId={modalSpecialistId}
         startTime={modalStartTime}
         date={date}
@@ -551,7 +625,7 @@ export default function DailyAgenda() {
         open={floatingModalOpen}
         onClose={() => setFloatingModalOpen(false)}
         onCreated={load}
-        specialists={specialists}
+        specialists={activeSpecialistsList}
       />
 
       <NewClientModal
@@ -564,6 +638,12 @@ export default function DailyAgenda() {
         onClose={() => setVacationModalOpen(false)}
         onCreated={load}
         specialists={specialists}
+      />
+
+      <CoverageModal
+        open={coverageModalOpen}
+        onClose={() => setCoverageModalOpen(false)}
+        onCreated={load}
       />
 
       <AppointmentDetailModal
