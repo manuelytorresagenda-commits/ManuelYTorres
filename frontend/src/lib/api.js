@@ -42,7 +42,7 @@ export const deleteService = (id) => api.delete(`/services/${id}`).then((r) => r
 // Citas
 export const fetchAppointments = (params = {}) => api.get("/appointments", { params }).then((r) => r.data);
 export const createAppointment = (data) => api.post("/appointments", data).then((r) => r.data);
-export const updateAppointment = (id, data) => api.put(`/appointments/${id}`, data).then((r) => r.data); // NUEVO: Para editar datos de la cita
+export const updateAppointment = (id, data) => api.put(`/appointments/${id}`, data).then((r) => r.data);
 export const updateAppointmentStatus = (id, status) => api.patch(`/appointments/${id}`, { status }).then((r) => r.data);
 export const updateAppointmentExtras = (id, additional_services) => api.patch(`/appointments/${id}`, { additional_services }).then((r) => r.data);
 export const rescheduleAppointment = (id, data) => api.post(`/appointments/${id}/reschedule`, data).then((r) => r.data);
@@ -58,3 +58,8 @@ export const createVacation = (data) => api.post("/vacations", data).then((r) =>
 export const deleteVacation = (id) => api.delete(`/vacations/${id}`).then((r) => r.data);
 export const deleteVacationDay = (id, date) =>
   api.delete(`/vacations/${id}/single-day`, { params: { date } }).then((r) => r.data);
+
+// Coberturas / Apoyos / Invitados (NUEVO)
+export const fetchCoverages = (params = {}) => api.get("/coverages", { params }).then((r) => r.data);
+export const createCoverage = (data) => api.post("/coverages", data).then((r) => r.data);
+export const deleteCoverage = (id) => api.delete(`/coverages/${id}`).then((r) => r.data);
