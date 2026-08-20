@@ -41,6 +41,21 @@ const FLOATING_STYLES = {
   Finalizada: "bg-sky-50 border-neutral-500 text-neutral-700 line-through border-dashed",
 };
 
+const PHYSICAL_ORDER_PROVIDENCIA = [
+  "manuel",
+  "claudia",
+  "veronica",
+  "verónica",
+  "joel",
+  "velia",
+  "rodolfo",
+  "angel",
+  "ángel",
+  "jaime",
+  "cristina",
+  "ellyn",
+];
+
 export default function DailyAgenda() {
   const [appointments, setAppointments] = useState([]);
   const [specialists, setSpecialists] = useState([]);
@@ -88,7 +103,7 @@ export default function DailyAgenda() {
 
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [branch, date]);
 
-  // Consolidar especialistas de planta + apoyos/invitados activos en esta fecha
+  // Consolidar especialistas de planta + apoyos/invitados activos en esta fecha y ordenar según la sucursal
   const activeSpecialistsList = useMemo(() => {
     const list = [...specialists];
     coverages.forEach((c) => {
@@ -115,8 +130,32 @@ export default function DailyAgenda() {
         }
       }
     });
-    return list;
-  }, [specialists, coverages, allSpecialistsList]);
+
+    const isProvidencia = (branch?.name || "").toLowerCase().includes("providencia");
+
+    // SI ES PROVIDENCIA: Forzar el orden estricto de la libreta de Providencia
+    if (isProvidencia) {
+      return list.sort((a, b) => {
+        const nameA = (a.name || "").toLowerCase();
+        const nameB = (b.name || "").toLowerCase();
+        const idxA = PHYSICAL_ORDER_PROVIDENCIA.findIndex((k) => nameA.includes(k));
+        const idxB = PHYSICAL_ORDER_PROVIDENCIA.findIndex((k) => nameB.includes(k));
+        const rankA = idxA === -1 ? 999 : idxA;
+        const rankB = idxB === -1 ? 999 : idxB;
+
+        if (rankA !== rankB) return rankA - rankB;
+        return nameA.localeCompare(nameB);
+      });
+    }
+
+    // SI ES CUALQUIER OTRA SUCURSAL: Respeta el orden de la base de datos o alfabético normal
+    return list.sort((a, b) => {
+      const orderA = typeof a.order === "number" ? a.order : 999;
+      const orderB = typeof b.order === "number" ? b.order : 999;
+      if (orderA !== orderB) return orderA - orderB;
+      return (a.name || "").localeCompare(b.name || "");
+    });
+  }, [specialists, coverages, allSpecialistsList, branch]);
 
   const findService = (id) => services.find((s) => s.id === id);
   const findSpecialist = (id) => activeSpecialistsList.find((s) => s.id === id) || allSpecialistsList.find((s) => s.id === id);
