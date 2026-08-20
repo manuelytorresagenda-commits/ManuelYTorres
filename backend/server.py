@@ -78,6 +78,7 @@ class Specialist(BaseModel):
     avatar_url: Optional[str] = None
     access_code: Optional[str] = None
     branch_id: Optional[str] = None
+    order: Optional[int] = 99
 
 
 class SpecialistCreate(BaseModel):
@@ -88,6 +89,7 @@ class SpecialistCreate(BaseModel):
     avatar_url: Optional[str] = None
     access_code: Optional[str] = None
     branch_id: Optional[str] = None
+    order: Optional[int] = 99
 
 
 class Receptionist(BaseModel):
@@ -476,7 +478,7 @@ async def list_specialists(branch_id: Optional[str] = None):
     q = {}
     if branch_id:
         q["branch_id"] = branch_id
-    docs = await db.specialists.find(q, {"_id": 0}).to_list(500)
+    docs = await db.specialists.find(q, {"_id": 0}).sort([("order", 1), ("name", 1)]).to_list(500)
     return docs
 
 
@@ -739,7 +741,7 @@ async def cancel_vacation_single_day(vacation_id: str, date: str):
     return {"success": True, "message": "Día intermedio removido y periodo dividido"}
 
 
-# ----------------------- COVERAGES / GUEST SPECIALISTS (NUEVO) -----------------------
+# ----------------------- COVERAGES / GUEST SPECIALISTS -----------------------
 @api_router.post("/coverages", response_model=Coverage)
 async def create_coverage(payload: CoverageCreate):
     _validate_date(payload.start_date)
@@ -835,19 +837,15 @@ async def create_appointment(payload: AppointmentCreate):
     if not (payload.client_name or "").strip():
         raise HTTPException(400, "Nombre del cliente requerido")
 
-    # Buscar si es especialista de planta o un invitado/cobertura temporal
     specialist = await db.specialists.find_one({"id": payload.specialist_id}, {"_id": 0})
-    coverage_active = None
 
     if not specialist:
-        # Puede ser un invitado externo por ID de cobertura
         cov = await db.coverages.find_one({
             "id": payload.specialist_id,
             "start_date": {"$lte": payload.date},
             "end_date": {"$gte": payload.date}
         }, {"_id": 0})
         if cov:
-            coverage_active = cov
             specialist = {
                 "id": cov["id"],
                 "name": cov.get("guest_name", "Invitado"),
@@ -1127,7 +1125,7 @@ async def reschedule_appointment(appt_id: str, payload: AppointmentReschedule):
 
     sp_start = time_to_minutes(specialist["start_time"])
     sp_end = time_to_minutes(specialist["end_time"])
-    if new_start < sp_start or new_end > sp_end:
+    if new_start < sp_start or end_min > sp_end:
         raise HTTPException(
             400,
             f"Horario fuera del turno ({specialist['start_time']} - {specialist['end_time']})"
