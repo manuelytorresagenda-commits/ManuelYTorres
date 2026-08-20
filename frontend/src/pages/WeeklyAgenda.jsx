@@ -6,17 +6,20 @@ import FloatingAppointmentModal from "../components/FloatingAppointmentModal";
 import AppointmentDetailModal from "../components/AppointmentDetailModal";
 import NewClientModal from "../components/NewClientModal";
 import VacationModal from "../components/VacationModal";
+import CoverageModal from "../components/CoverageModal";
 import {
   fetchAppointments,
   fetchSpecialists,
   fetchServices,
   fetchVacations,
+  fetchCoverages,
+  deleteCoverage,
   deleteVacationDay,
   updateAppointmentStatus,
   deleteAppointment,
 } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
-import { ChevronLeft, ChevronRight, Plus, Wind, UserPlus, Trash2, Play, CheckCircle2, Palmtree } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, Wind, UserPlus, Trash2, Play, CheckCircle2, Palmtree, Users } from "lucide-react";
 import { toast } from "sonner";
 import { SLOTS, minToTime, buildOverlapGrid } from "../lib/scheduling";
 
@@ -35,14 +38,17 @@ export default function WeeklyAgenda() {
   const [weekStart, setWeekStart] = useState(startOfWeek(new Date()));
   const [appointments, setAppointments] = useState([]);
   const [specialists, setSpecialists] = useState([]);
+  const [allSpecialistsList, setAllSpecialistsList] = useState([]);
   const [services, setServices] = useState([]);
   const [vacations, setVacations] = useState([]);
+  const [coverages, setCoverages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filterSpecialist, setFilterSpecialist] = useState("all");
   const [modalOpen, setModalOpen] = useState(false);
   const [floatingModalOpen, setFloatingModalOpen] = useState(false);
   const [clientModalOpen, setClientModalOpen] = useState(false);
   const [vacationModalOpen, setVacationModalOpen] = useState(false);
+  const [coverageModalOpen, setCoverageModalOpen] = useState(false);
   const [modalSpecialistId, setModalSpecialistId] = useState("");
   const [modalStartTime, setModalStartTime] = useState("");
   const [modalDate, setModalDate] = useState("");
@@ -62,16 +68,20 @@ export default function WeeklyAgenda() {
     setLoading(true);
     try {
       const ws = weekStart.toISOString().slice(0, 10);
-      const [a, sp, sv, v] = await Promise.all([
+      const [a, sp, allSp, sv, v, cov] = await Promise.all([
         fetchAppointments({ week_start: ws, branch_id: branch.id }),
         fetchSpecialists({ branch_id: branch.id }),
+        fetchSpecialists(),
         fetchServices({ branch_id: branch.id }),
         fetchVacations({ week_start: ws, branch_id: branch.id }),
+        fetchCoverages({ week_start: ws, target_branch_id: branch.id }),
       ]);
       setAppointments(a);
       setSpecialists(sp);
+      setAllSpecialistsList(allSp);
       setServices(sv);
       setVacations(v);
+      setCoverages(cov);
     } catch { 
       toast.error("Error cargando datos"); 
     } finally { 
@@ -89,7 +99,39 @@ export default function WeeklyAgenda() {
   };
   const goToday = () => setWeekStart(startOfWeek(new Date()));
 
-  const findSp = (id) => specialists.find((s) => s.id === id);
+  // Consolidar especialistas de planta + apoyos/invitados que coincidan con la semana
+  const activeSpecialistsList = useMemo(() => {
+    const list = [...specialists];
+    coverages.forEach((c) => {
+      if (c.is_guest) {
+        if (!list.some((s) => s.id === c.id)) {
+          list.push({
+            id: c.id,
+            name: c.guest_name,
+            specialty: c.specialty || "Invitada",
+            start_time: c.start_time || "09:00",
+            end_time: c.end_time || "18:00",
+            is_coverage: true,
+            coverage_id: c.id,
+            reason: c.reason,
+          });
+        }
+      } else if (c.specialist_id) {
+        const found = allSpecialistsList.find((s) => s.id === c.specialist_id);
+        if (found && !list.some((s) => s.id === found.id)) {
+          list.push({
+            ...found,
+            is_coverage: true,
+            coverage_id: c.id,
+            reason: c.reason,
+          });
+        }
+      }
+    });
+    return list;
+  }, [specialists, coverages, allSpecialistsList]);
+
+  const findSp = (id) => activeSpecialistsList.find((s) => s.id === id) || allSpecialistsList.find((s) => s.id === id);
   const findSv = (id) => services.find((s) => s.id === id);
 
   const isSpecialistOnVacation = (spId, dateStr) => {
@@ -100,6 +142,16 @@ export default function WeeklyAgenda() {
 
   const getDayVacations = (dateStr) => {
     return vacations.filter((v) => v.start_date <= dateStr && v.end_date >= dateStr);
+  };
+
+  const isSpecialistActiveOnDate = (sp, dateStr) => {
+    if (!sp.is_coverage) return true;
+    const cov = coverages.find(
+      (c) => (c.id === sp.id || c.specialist_id === sp.id) &&
+             c.start_date <= dateStr &&
+             c.end_date >= dateStr
+    );
+    return !!cov;
   };
 
   const handleCancelVacationForDay = async (vacation, dateStr) => {
@@ -156,6 +208,11 @@ export default function WeeklyAgenda() {
 
   const openModalForCell = (dateStr, slotMin) => {
     if (filterSpecialist !== "all") {
+      const sp = findSp(filterSpecialist);
+      if (sp && !isSpecialistActiveOnDate(sp, dateStr)) {
+        toast.error(`El estilista de apoyo no está programado para el día ${dateStr}.`);
+        return;
+      }
       const vac = isSpecialistOnVacation(filterSpecialist, dateStr);
       if (vac) {
         toast.error(`El especialista no está disponible (${vac.reason || "Vacaciones"}).`);
@@ -184,6 +241,14 @@ export default function WeeklyAgenda() {
         description="Vista calendario de toda la semana. Navegue entre semanas con las flechas."
         action={
           <div className="flex items-center gap-2">
+            <button
+              data-testid="header-coverage-btn"
+              onClick={() => setCoverageModalOpen(true)}
+              className="btn-invert border border-black bg-white text-black px-4 py-3 font-mono-label text-[10px] font-bold hover:bg-neutral-100 flex items-center gap-2 transition-colors"
+            >
+              <Users className="w-3 h-3" strokeWidth={2} />
+              Apoyo / Invitado
+            </button>
             <button
               data-testid="header-vacation-btn"
               onClick={() => setVacationModalOpen(true)}
@@ -243,7 +308,7 @@ export default function WeeklyAgenda() {
       </div>
 
       <SpecialistFilter
-        specialists={specialists}
+        specialists={activeSpecialistsList}
         value={filterSpecialist}
         onChange={setFilterSpecialist}
       />
@@ -264,17 +329,19 @@ export default function WeeklyAgenda() {
                     const ds = d.toISOString().slice(0, 10);
                     const dayVacs = getDayVacations(ds);
                     const spVac = filterSpecialist !== "all" ? isSpecialistOnVacation(filterSpecialist, ds) : null;
+                    const selectedSp = filterSpecialist !== "all" ? findSp(filterSpecialist) : null;
+                    const isCoverageInactive = selectedSp?.is_coverage && !isSpecialistActiveOnDate(selectedSp, ds);
 
                     return (
                       <th key={i} className={`sticky top-0 z-20 border-b border-r border-black p-3 text-left min-w-[150px] ${
-                        isToday ? "bg-black text-white" : spVac ? "bg-neutral-100 text-black" : "bg-white text-black"
+                        isToday ? "bg-black text-white" : (spVac || isCoverageInactive) ? "bg-neutral-100 text-black" : "bg-white text-black"
                       }`}>
                         <div className="font-mono-label text-[10px] font-bold opacity-80 flex items-center justify-between">
                           <span>{DAYS_ES[i]}</span>
                         </div>
                         <div className="font-serif-display text-2xl font-bold leading-none mt-1">{d.getDate()}</div>
                         
-                        {/* Pastilla en cabecera con botón de papelera para cancelar este día puntual */}
+                        {/* Pastilla de vacaciones */}
                         {spVac && (
                           <div className="mt-2 flex items-center justify-between bg-neutral-200 border border-black/40 px-2 py-1">
                             <span className="font-mono-label text-[8px] font-bold uppercase truncate text-black">
@@ -288,6 +355,13 @@ export default function WeeklyAgenda() {
                             >
                               <Trash2 className="w-2.5 h-2.5" strokeWidth={2} />
                             </button>
+                          </div>
+                        )}
+
+                        {/* Pastilla si el apoyo no cubre este día */}
+                        {isCoverageInactive && (
+                          <div className="mt-2 bg-neutral-200/80 border border-black/20 px-2 py-0.5 text-center font-mono-label text-[8px] font-bold uppercase text-neutral-600">
+                            SIN COBERTURA
                           </div>
                         )}
 
@@ -312,14 +386,16 @@ export default function WeeklyAgenda() {
                     {days.map((d, i) => {
                       const ds = d.toISOString().slice(0, 10);
                       const spVac = filterSpecialist !== "all" ? isSpecialistOnVacation(filterSpecialist, ds) : null;
+                      const selectedSp = filterSpecialist !== "all" ? findSp(filterSpecialist) : null;
+                      const isCoverageInactive = selectedSp?.is_coverage && !isSpecialistActiveOnDate(selectedSp, ds);
 
-                      // Si el especialista filtrado está de vacaciones este día puntual
-                      if (spVac) {
+                      // Si está de vacaciones o el apoyo no aplica para este día
+                      if (spVac || isCoverageInactive) {
                         return (
                           <td
                             key={i}
                             className="border-b border-r border-neutral-300 p-1.5 h-10 bg-neutral-100/60 cursor-not-allowed select-none"
-                            title={`${spVac.reason || "Vacaciones"} (${spVac.start_date} a ${spVac.end_date})`}
+                            title={spVac ? `${spVac.reason || "Vacaciones"}` : "Estilista fuera de periodo de apoyo"}
                           >
                             <div className="w-full h-full border border-dashed border-neutral-300 flex items-center justify-center">
                               <span className="font-mono-label text-[8px] font-bold text-neutral-400 uppercase tracking-wider">
@@ -393,7 +469,10 @@ export default function WeeklyAgenda() {
                                             </span>
                                           )}
                                           {a.is_overbooked && !a.is_floating && (
-                                            <span className="font-mono-label text-[7px] font-bold bg-amber-400 text-black px-1 border border-black">
+                                            <span
+                                              data-testid={`extra-badge-${a.id}`}
+                                              className="font-mono-label text-[7px] font-bold bg-amber-400 text-black px-1 border border-black"
+                                            >
                                               EXTRA
                                             </span>
                                           )}
@@ -411,8 +490,13 @@ export default function WeeklyAgenda() {
                                     </div>
                                     <div className="mt-auto pt-2">
                                       {sp && (
-                                        <div className="font-mono-label text-[8px] font-bold opacity-90 uppercase mb-1.5">
-                                          {sp.name}
+                                        <div className="font-mono-label text-[8px] font-bold opacity-90 uppercase mb-1.5 flex items-center justify-between">
+                                          <span>{sp.name}</span>
+                                          {sp.is_coverage && (
+                                            <span className="bg-black text-white px-1 py-0.2 text-[7px]">
+                                              {sp.reason || "APOYO"}
+                                            </span>
+                                          )}
                                         </div>
                                       )}
                                       <div
@@ -485,7 +569,7 @@ export default function WeeklyAgenda() {
         open={modalOpen}
         onClose={() => setModalOpen(false)}
         onCreated={load}
-        specialists={specialists}
+        specialists={activeSpecialistsList}
         specialistId={modalSpecialistId}
         startTime={modalStartTime}
         date={modalDate}
@@ -495,7 +579,7 @@ export default function WeeklyAgenda() {
         open={floatingModalOpen}
         onClose={() => setFloatingModalOpen(false)}
         onCreated={load}
-        specialists={specialists}
+        specialists={activeSpecialistsList}
       />
 
       <NewClientModal
@@ -508,6 +592,12 @@ export default function WeeklyAgenda() {
         onClose={() => setVacationModalOpen(false)}
         onCreated={load}
         specialists={specialists}
+      />
+
+      <CoverageModal
+        open={coverageModalOpen}
+        onClose={() => setCoverageModalOpen(false)}
+        onCreated={load}
       />
 
       <AppointmentDetailModal
