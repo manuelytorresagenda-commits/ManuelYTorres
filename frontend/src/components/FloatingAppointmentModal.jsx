@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "./ui/dialog";
-import { createAppointment, fetchReceptionists } from "../lib/api";
+import { createAppointment, fetchServices, fetchReceptionists } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import { toast } from "sonner";
-import { X, Wind, Instagram, Music2, Cake, UserCheck } from "lucide-react";
+import { X, Wind, Instagram, Music2, Cake, Search, UserCheck } from "lucide-react";
 import ClientAutocomplete from "./ClientAutocomplete";
 
 const QUICK_DURATIONS = [15, 30, 45, 60, 90];
@@ -15,14 +15,18 @@ export default function FloatingAppointmentModal({
   specialists = [],
 }) {
   const { branch } = useAuth();
+  const [services, setServices] = useState([]);
   const [receptionists, setReceptionists] = useState([]);
+  const [serviceQuery, setServiceQuery] = useState("");
+
   const [specialistId, setSpecialistId] = useState("");
+  const [serviceId, setServiceId] = useState("");
+  const [customServiceName, setCustomServiceName] = useState("");
   const [clientName, setClientName] = useState("");
   const [clientPhone, setClientPhone] = useState("");
   const [clientInstagram, setClientInstagram] = useState("");
   const [clientTiktok, setClientTiktok] = useState("");
   const [clientBirthday, setClientBirthday] = useState("");
-  const [serviceName, setServiceName] = useState("");
   const [receptionistName, setReceptionistName] = useState("");
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [startTime, setStartTime] = useState("");
@@ -32,21 +36,26 @@ export default function FloatingAppointmentModal({
   useEffect(() => {
     if (open) {
       setSpecialistId("");
+      setServiceId("");
+      setCustomServiceName("");
       setClientName("");
       setClientPhone("");
       setClientInstagram("");
       setClientTiktok("");
       setClientBirthday("");
-      setServiceName("");
       setReceptionistName("");
       setDate(new Date().toISOString().slice(0, 10));
       setStartTime("");
       setDuration(30);
+      setServiceQuery("");
     }
   }, [open]);
 
   useEffect(() => {
     if (!open || !branch) return;
+    fetchServices({ branch_id: branch.id })
+      .then(setServices)
+      .catch(() => toast.error("Error cargando servicios"));
     fetchReceptionists({ branch_id: branch.id })
       .then((rc) => {
         setReceptionists(rc);
@@ -57,16 +66,39 @@ export default function FloatingAppointmentModal({
       .catch(() => {});
   }, [open, branch]);
 
+  const sv = services.find((s) => s.id === serviceId);
+  const resolvedServiceName = sv ? sv.name : customServiceName.trim();
+
+  const handleSelectService = (s) => {
+    if (serviceId === s.id) {
+      setServiceId("");
+      setCustomServiceName("");
+    } else {
+      setServiceId(s.id);
+      setCustomServiceName(s.name);
+      if (s.duration_minutes) {
+        setDuration(Number(s.duration_minutes));
+      }
+    }
+  };
+
   const submit = async (e) => {
     e.preventDefault();
-    if (!specialistId || !clientName || !serviceName || !date || !startTime || !duration) {
-      toast.error("Complete todos los campos");
+    if (!specialistId || !clientName || !resolvedServiceName || !date || !startTime || !duration) {
+      toast.error("Complete todos los campos requeridos");
       return;
     }
+    const finalDuration = parseInt(duration, 10);
+    if (!finalDuration || finalDuration <= 0) {
+      toast.error("La duración debe ser mayor a 0 minutos");
+      return;
+    }
+
     setSubmitting(true);
     try {
       await createAppointment({
         specialist_id: specialistId,
+        service_id: serviceId || "",
         client_name: clientName,
         client_phone: clientPhone,
         client_instagram: clientInstagram,
@@ -76,8 +108,8 @@ export default function FloatingAppointmentModal({
         date,
         start_time: startTime,
         is_floating: true,
-        custom_service_name: serviceName,
-        custom_duration_minutes: parseInt(duration),
+        custom_service_name: resolvedServiceName,
+        custom_duration_minutes: finalDuration,
       });
       toast.success("Cita flotante registrada");
       onCreated && onCreated();
@@ -93,21 +125,21 @@ export default function FloatingAppointmentModal({
     <Dialog open={open} onOpenChange={(v) => !v && onClose && onClose()}>
       <DialogContent
         data-testid="floating-appointment-modal"
-        className="max-w-lg bg-white border-2 border-black rounded-none p-0 gap-0 [&>button]:hidden"
+        className="max-w-2xl bg-white border-2 border-black rounded-none p-0 gap-0 [&>button]:hidden"
       >
         <DialogTitle className="sr-only">Cita Flotante</DialogTitle>
         <DialogDescription className="sr-only">
           Cita rápida que puede solaparse con horarios ya ocupados.
         </DialogDescription>
 
-        <div className="flex items-start justify-between p-6 border-b-2 border-black bg-sky-50">
+        <div className="flex items-start justify-between p-6 lg:p-8 border-b-2 border-black bg-sky-50">
           <div>
             <div className="flex items-center gap-2">
               <Wind className="w-3.5 h-3.5 text-black" strokeWidth={2} />
               <span className="font-mono-label text-[10px] font-bold text-black">CITA RÁPIDA</span>
             </div>
-            <div className="font-serif-display text-3xl mt-1 leading-none text-black font-bold">
-              <em className="italic">Flotante</em>
+            <div className="font-serif-display text-3xl lg:text-4xl mt-1 leading-none text-black font-bold">
+              Cita <em className="italic">Flotante</em>
             </div>
             <div className="text-[11px] font-semibold text-neutral-800 mt-1">
               Permite solapar con citas existentes y rellenar huecos.
@@ -117,14 +149,15 @@ export default function FloatingAppointmentModal({
             type="button"
             data-testid="floating-close-btn"
             onClick={onClose}
-            className="btn-invert border-2 border-black p-2 hover:bg-black hover:text-white"
+            className="btn-invert border-2 border-black bg-white p-2 hover:bg-black hover:text-white"
             aria-label="Cerrar"
           >
             <X className="w-4 h-4" strokeWidth={2} />
           </button>
         </div>
 
-        <form onSubmit={submit} className="p-6 space-y-5 max-h-[75vh] overflow-y-auto">
+        <form onSubmit={submit} className="p-6 lg:p-8 space-y-5 max-h-[75vh] overflow-y-auto">
+          {/* Especialista */}
           <div>
             <label className="font-mono-label text-[10px] font-bold text-black block mb-2">
               ESPECIALISTA
@@ -144,20 +177,92 @@ export default function FloatingAppointmentModal({
             </select>
           </div>
 
+          {/* Servicio */}
           <div>
             <label className="font-mono-label text-[10px] font-bold text-black block mb-2">
-              SERVICIO / TRABAJO
+              SERVICIO
             </label>
-            <input
-              data-testid="floating-service-input"
-              type="text"
-              value={serviceName}
-              onChange={(e) => setServiceName(e.target.value)}
-              placeholder="Ej. Retoque rápido, Cejas, Consulta..."
-              className="w-full border-2 border-black px-4 py-3 bg-white outline-none focus:ring-1 focus:ring-black font-serif-display text-base font-bold text-black placeholder:text-neutral-500"
-            />
+            <div className="relative mb-2">
+              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-black" strokeWidth={2} />
+              <input
+                type="text"
+                data-testid="floating-service-search"
+                value={serviceQuery}
+                onChange={(e) => setServiceQuery(e.target.value)}
+                placeholder="Buscar servicio…"
+                autoComplete="off"
+                className="w-full border-2 border-black pl-9 pr-9 py-2 bg-white outline-none focus:ring-1 focus:ring-black font-mono-label text-xs font-bold text-black placeholder:text-neutral-500"
+              />
+              {serviceQuery && (
+                <button
+                  type="button"
+                  onClick={() => setServiceQuery("")}
+                  aria-label="Limpiar búsqueda"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-black hover:opacity-70"
+                >
+                  <X className="w-3.5 h-3.5" strokeWidth={2} />
+                </button>
+              )}
+            </div>
+
+            {(() => {
+              const norm = (s) => (s || "")
+                .toString()
+                .toLowerCase()
+                .normalize("NFD")
+                .replace(/[\u0300-\u036f]/g, "");
+              const q = norm(serviceQuery.trim());
+              const filtered = q
+                ? services.filter((s) => norm(s.name).includes(q))
+                : services;
+
+              if (filtered.length === 0) {
+                return (
+                  <div className="border-2 border-dashed border-neutral-300 p-4 text-center font-mono-label text-[10px] font-bold text-black">
+                    Sin coincidencias para “{serviceQuery}”
+                  </div>
+                );
+              }
+              return (
+                <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto" data-testid="floating-service-list">
+                  {filtered.map((s) => (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => handleSelectService(s)}
+                      className={`btn-invert border-2 p-3 text-left ${
+                        serviceId === s.id
+                          ? "border-black bg-black text-white"
+                          : "border-neutral-300 hover:border-black text-black"
+                      }`}
+                    >
+                      <div className="font-serif-display text-base font-bold leading-tight">{s.name}</div>
+                      <div className="font-mono-label text-[9px] font-bold opacity-80 mt-1">
+                        {s.duration_minutes} MIN
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              );
+            })()}
+
+            {/* Opción de servicio manual alternativo */}
+            <div className="mt-2">
+              <input
+                type="text"
+                data-testid="floating-service-custom-input"
+                value={customServiceName}
+                onChange={(e) => {
+                  setCustomServiceName(e.target.value);
+                  if (serviceId) setServiceId("");
+                }}
+                placeholder="O escriba un servicio manual (ej. Retoque rápido, Cejas, Consulta...)"
+                className="w-full border-2 border-black px-4 py-2.5 bg-white outline-none focus:ring-1 focus:ring-black font-serif-display text-sm font-bold text-black placeholder:text-neutral-500 placeholder:font-sans placeholder:text-xs"
+              />
+            </div>
           </div>
 
+          {/* Cliente */}
           <div>
             <label className="font-mono-label text-[10px] font-bold text-black block mb-2">CLIENTE</label>
             <ClientAutocomplete
@@ -176,6 +281,7 @@ export default function FloatingAppointmentModal({
             />
           </div>
 
+          {/* Teléfono */}
           <div>
             <label className="font-mono-label text-[10px] font-bold text-black block mb-2">
               TELÉFONO <span className="opacity-70">(opcional)</span>
@@ -190,6 +296,7 @@ export default function FloatingAppointmentModal({
             />
           </div>
 
+          {/* Redes y Cumpleaños */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
             <div>
               <label className="font-mono-label text-[10px] font-bold text-black block mb-2 flex items-center gap-1">
@@ -239,6 +346,7 @@ export default function FloatingAppointmentModal({
             </div>
           </div>
 
+          {/* Fecha y Hora */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="font-mono-label text-[10px] font-bold text-black block mb-2">FECHA</label>
@@ -264,6 +372,7 @@ export default function FloatingAppointmentModal({
             </div>
           </div>
 
+          {/* Duración */}
           <div>
             <label className="font-mono-label text-[10px] font-bold text-black block mb-2">
               DURACIÓN (MIN)
@@ -291,12 +400,12 @@ export default function FloatingAppointmentModal({
               min="5"
               step="5"
               value={duration}
-              onChange={(e) => setDuration(parseInt(e.target.value) || 0)}
+              onChange={(e) => setDuration(parseInt(e.target.value, 10) || 0)}
               className="w-full border-2 border-black px-4 py-2 bg-white outline-none focus:ring-1 focus:ring-black font-mono-label text-xs font-bold text-black"
             />
           </div>
 
-          {/* RECEPCIONISTA (HASTA ABAJO) */}
+          {/* Recepcionista */}
           <div>
             <label className="font-mono-label text-[10px] font-bold text-black block mb-2 flex items-center gap-1">
               <UserCheck className="w-3.5 h-3.5 text-black" strokeWidth={2} /> RECEPCIONISTA (QUIEN ATENDIÓ)
