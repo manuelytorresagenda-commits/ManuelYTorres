@@ -383,6 +383,31 @@ async def _get_appt_lock(specialist_id: str, date: str) -> asyncio.Lock:
         return lock
 
 
+async def fix_patria_specialists_order():
+    """Aplica el orden exacto de los especialistas para la sucursal Patria sin afectar a las demás."""
+    patria_order = [
+        ("manuel", 1),      # 1. Manuel Torres
+        ("adriana", 2),     # 2. Adriana Arce
+        ("laura", 3),       # 3. Laura Barajas
+        ("brigido", 4),     # 4. Brigido Castellanos (Brich)
+        ("edgar", 5),       # 5. Edgar Cardenas
+        ("guadalupe", 6),   # 6. Guadalupe Mendoza (Lupita)
+        ("carlos", 7),      # 7. Carlos Martinez
+        ("jaime", 8),       # 8. Jaime Torres
+    ]
+    
+    patria_branch = await db.branches.find_one({"name": {"$regex": "patria", "$options": "i"}}, {"_id": 0})
+    if patria_branch:
+        for keyword, order_num in patria_order:
+            await db.specialists.update_many(
+                {
+                    "branch_id": patria_branch["id"],
+                    "name": {"$regex": f"\\b{keyword}", "$options": "i"}
+                },
+                {"$set": {"order": order_num}}
+            )
+
+
 # ----------------------- AUTH -----------------------
 @api_router.post("/auth/verify-pin")
 async def verify_pin(payload: PinVerify):
@@ -1383,6 +1408,11 @@ async def on_startup():
         logger.info("Seed completed")
     except Exception as e:
         logger.error(f"Seed failed: {e}")
+    try:
+        await fix_patria_specialists_order()
+        logger.info("Patria specialists order synchronized successfully")
+    except Exception as e:
+        logger.error(f"Patria specialists order fix failed: {e}")
 
 
 @app.on_event("shutdown")
