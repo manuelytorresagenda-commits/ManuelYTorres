@@ -133,6 +133,7 @@ class Client(BaseModel):
     instagram: Optional[str] = ""
     tiktok: Optional[str] = ""
     birthday: Optional[str] = ""  # "YYYY-MM-DD" or "MM-DD" or ""
+    branch_id: Optional[str] = None
 
 
 class ClientCreate(BaseModel):
@@ -141,6 +142,7 @@ class ClientCreate(BaseModel):
     instagram: Optional[str] = ""
     tiktok: Optional[str] = ""
     birthday: Optional[str] = ""
+    branch_id: Optional[str] = None
 
 
 class AdditionalService(BaseModel):
@@ -326,7 +328,7 @@ def _normalize_birthday(value: Optional[str]) -> str:
     return v
 
 
-async def _upsert_client(name: str, phone: str, instagram: str, tiktok: str, birthday: str) -> None:
+async def _upsert_client(name: str, phone: str, instagram: str, tiktok: str, birthday: str, branch_id: Optional[str] = None) -> None:
     if not name:
         return
     
@@ -336,6 +338,8 @@ async def _upsert_client(name: str, phone: str, instagram: str, tiktok: str, bir
     query = {"name": {"$regex": f"^{re.escape(clean_name)}$", "$options": "i"}}
     if clean_phone:
         query["phone"] = clean_phone
+    if branch_id:
+        query["branch_id"] = branch_id
 
     existing = await db.clients.find_one(query, {"_id": 0})
 
@@ -347,6 +351,8 @@ async def _upsert_client(name: str, phone: str, instagram: str, tiktok: str, bir
             update_fields["tiktok"] = tiktok
         if birthday and existing.get("birthday") != birthday:
             update_fields["birthday"] = birthday
+        if branch_id and existing.get("branch_id") != branch_id:
+            update_fields["branch_id"] = branch_id
             
         if update_fields:
             await db.clients.update_one({"id": existing["id"]}, {"$set": update_fields})
@@ -357,7 +363,8 @@ async def _upsert_client(name: str, phone: str, instagram: str, tiktok: str, bir
             phone=clean_phone, 
             instagram=instagram, 
             tiktok=tiktok, 
-            birthday=birthday
+            birthday=birthday,
+            branch_id=branch_id
         )
         await db.clients.insert_one(client_obj.model_dump())
 
@@ -584,27 +591,40 @@ async def create_client(payload: ClientCreate):
         instagram=instagram_clean,
         tiktok=tiktok_clean,
         birthday=birthday_clean,
+        branch_id=payload.branch_id,
     )
 
     query = {"name": {"$regex": f"^{re.escape(name_clean)}$", "$options": "i"}}
     if phone_clean:
         query["phone"] = phone_clean
+    if payload.branch_id:
+        query["branch_id"] = payload.branch_id
     doc = await db.clients.find_one(query, {"_id": 0})
     return doc
 
 
 @api_router.get("/clients", response_model=List[Client])
-async def list_clients(q: Optional[str] = None, limit: int = 20):
+async def list_clients(q: Optional[str] = None, branch_id: Optional[str] = None, limit: int = 20):
     query = {}
+    if branch_id:
+        query["branch_id"] = branch_id
+
     if q:
         safe = re.escape(q.strip())
         if safe:
-            query = {"$or": [
-                {"name": {"$regex": safe, "$options": "i"}},
-                {"phone": {"$regex": safe}},
-                {"instagram": {"$regex": safe, "$options": "i"}},
-                {"tiktok": {"$regex": safe, "$options": "i"}},
-            ]}
+            text_match = {
+                "$or": [
+                    {"name": {"$regex": safe, "$options": "i"}},
+                    {"phone": {"$regex": safe}},
+                    {"instagram": {"$regex": safe, "$options": "i"}},
+                    {"tiktok": {"$regex": safe, "$options": "i"}},
+                ]
+            }
+            if branch_id:
+                query = {"$and": [{"branch_id": branch_id}, text_match]}
+            else:
+                query = text_match
+
     docs = await db.clients.find(query, {"_id": 0}).to_list(500)
     q_norm = (q or "").strip().lower()
     def _rank(c):
@@ -701,31 +721,25 @@ async def cancel_vacation_single_day(vacation_id: str, date: str):
     if target_d < start_d or target_d > end_d:
         raise HTTPException(400, "La fecha indicada no cae dentro de este periodo de vacaciones")
 
-    # Caso 1: Vacación de 1 solo día -> se borra el registro completo
     if start_d == end_d:
         await db.vacations.delete_one({"id": vacation_id})
         return {"success": True, "message": "Vacación eliminada"}
 
-    # Caso 2: Se cancela el primer día del rango -> mover start_date 1 día adelante
     if target_d == start_d:
         new_start = (start_d + timedelta(days=1)).strftime("%Y-%m-%d")
         await db.vacations.update_one({"id": vacation_id}, {"$set": {"start_date": new_start}})
         return {"success": True, "message": "Día inicial removido del rango"}
 
-    # Caso 3: Se cancela el último día del rango -> mover end_date 1 día atrás
     if target_d == end_d:
         new_end = (end_d - timedelta(days=1)).strftime("%Y-%m-%d")
         await db.vacations.update_one({"id": vacation_id}, {"$set": {"end_date": new_end}})
         return {"success": True, "message": "Día final removido del rango"}
 
-    # Caso 4: Se cancela un día intermedio -> Dividir en dos rangos
     first_end = (target_d - timedelta(days=1)).strftime("%Y-%m-%d")
     second_start = (target_d + timedelta(days=1)).strftime("%Y-%m-%d")
 
-    # Acortar el actual
     await db.vacations.update_one({"id": vacation_id}, {"$set": {"end_date": first_end}})
 
-    # Insertar el nuevo tramo posterior
     new_vac = Vacation(
         specialist_id=vac["specialist_id"],
         specialist_name=vac.get("specialist_name", ""),
@@ -857,7 +871,6 @@ async def create_appointment(payload: AppointmentCreate):
         else:
             raise HTTPException(400, "Especialista o invitado no encontrado / no activo en esta fecha")
 
-    # Verificar si está de vacaciones
     vacation = await db.vacations.find_one({
         "specialist_id": payload.specialist_id,
         "start_date": {"$lte": payload.date},
@@ -962,6 +975,7 @@ async def create_appointment(payload: AppointmentCreate):
         instagram=appt.client_instagram,
         tiktok=appt.client_tiktok,
         birthday=appt.client_birthday,
+        branch_id=specialist.get("branch_id"),
     )
 
     return appt
@@ -1019,6 +1033,7 @@ async def update_appointment(appt_id: str, payload: AppointmentUpdate):
             instagram=existing.get("client_instagram", ""),
             tiktok=existing.get("client_tiktok", ""),
             birthday=existing.get("client_birthday", ""),
+            branch_id=existing.get("branch_id"),
         )
 
     return existing
@@ -1047,6 +1062,7 @@ async def update_appointment_full(appt_id: str, data: dict):
         instagram=existing.get("client_instagram", ""),
         tiktok=existing.get("client_tiktok", ""),
         birthday=existing.get("client_birthday", ""),
+        branch_id=existing.get("branch_id"),
     )
 
     if isinstance(existing.get("created_at"), str):
@@ -1095,7 +1111,6 @@ async def reschedule_appointment(appt_id: str, payload: AppointmentReschedule):
         else:
             raise HTTPException(400, "Especialista no encontrado")
 
-    # Verificar si está de vacaciones
     vacation = await db.vacations.find_one({
         "specialist_id": new_specialist_id,
         "start_date": {"$lte": payload.date},
@@ -1125,7 +1140,7 @@ async def reschedule_appointment(appt_id: str, payload: AppointmentReschedule):
 
     sp_start = time_to_minutes(specialist["start_time"])
     sp_end = time_to_minutes(specialist["end_time"])
-    if new_start < sp_start or end_min > sp_end:
+    if new_start < sp_start or new_end > sp_end:
         raise HTTPException(
             400,
             f"Horario fuera del turno ({specialist['start_time']} - {specialist['end_time']})"
@@ -1352,6 +1367,7 @@ async def on_startup():
         await db.receptionists.create_index("id", unique=True)
         await db.services.create_index("id", unique=True)
         await db.branches.create_index("id", unique=True)
+        await db.clients.create_index([("branch_id", 1), ("name", 1)])
         await db.clients.create_index("phone")
         await db.clients.create_index("name")
         await db.vacations.create_index([("specialist_id", 1), ("start_date", 1), ("end_date", 1)])
