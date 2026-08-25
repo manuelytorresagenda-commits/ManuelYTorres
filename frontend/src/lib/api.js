@@ -27,7 +27,7 @@ export const createSpecialist = (data) => api.post("/specialists", data).then((r
 export const updateSpecialist = (id, data) => api.put(`/specialists/${id}`, data).then((r) => r.data);
 export const deleteSpecialist = (id) => api.delete(`/specialists/${id}`).then((r) => r.data);
 
-// Recepcionistas (NUEVO)
+// Recepcionistas
 export const fetchReceptionists = (params = {}) => api.get("/receptionists", { params }).then((r) => r.data);
 export const createReceptionist = (data) => api.post("/receptionists", data).then((r) => r.data);
 export const updateReceptionist = (id, data) => api.put(`/receptionists/${id}`, data).then((r) => r.data);
@@ -48,8 +48,11 @@ export const updateAppointmentExtras = (id, additional_services) => api.patch(`/
 export const rescheduleAppointment = (id, data) => api.post(`/appointments/${id}/reschedule`, data).then((r) => r.data);
 export const deleteAppointment = (id) => api.delete(`/appointments/${id}`).then((r) => r.data);
 
-// Clientes
-export const fetchClients = (q) => api.get("/clients", { params: q ? { q } : {} }).then((r) => r.data);
+// Clientes (Acepta string de búsqueda o params con branch_id)
+export const fetchClients = (paramsOrQuery = {}) => {
+  const params = typeof paramsOrQuery === "string" ? { q: paramsOrQuery } : paramsOrQuery;
+  return api.get("/clients", { params }).then((r) => r.data);
+};
 export const createClient = (data) => api.post("/clients", data).then((r) => r.data);
 
 // Vacaciones / Ausencias
@@ -59,7 +62,7 @@ export const deleteVacation = (id) => api.delete(`/vacations/${id}`).then((r) =>
 export const deleteVacationDay = (id, date) =>
   api.delete(`/vacations/${id}/single-day`, { params: { date } }).then((r) => r.data);
 
-// Coberturas / Apoyos / Invitados (NUEVO)
+// Coberturas / Apoyos / Invitados
 export const fetchCoverages = (params = {}) => api.get("/coverages", { params }).then((r) => r.data);
 export const createCoverage = (data) => api.post("/coverages", data).then((r) => r.data);
 export const deleteCoverage = (id) => api.delete(`/coverages/${id}`).then((r) => r.data);
