@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { fetchClients } from "../lib/api";
+import { useAuth } from "../context/AuthContext";
 
 /**
- * Client name input with debounced autocomplete.
+ * Client name input with debounced autocomplete filtered by active branch.
  *
  * Props:
  *  - value: current name string
@@ -18,13 +19,14 @@ export default function ClientAutocomplete({
   testid = "client-name-autocomplete",
   placeholder = "Nombre completo",
 }) {
+  const { branch } = useAuth();
   const [open, setOpen] = useState(false);
   const [results, setResults] = useState([]);
   const [active, setActive] = useState(-1);
   const wrapRef = useRef(null);
   const skipNextSearch = useRef(false);
 
-  // Debounced search
+  // Debounced search filtered by branch
   useEffect(() => {
     if (skipNextSearch.current) {
       skipNextSearch.current = false;
@@ -38,7 +40,10 @@ export default function ClientAutocomplete({
     }
     const timer = setTimeout(async () => {
       try {
-        const data = await fetchClients(q);
+        const data = await fetchClients({
+          q,
+          branch_id: branch?.id || "",
+        });
         setResults(Array.isArray(data) ? data.slice(0, 8) : []);
         setOpen(true);
         setActive(-1);
@@ -47,7 +52,7 @@ export default function ClientAutocomplete({
       }
     }, 220);
     return () => clearTimeout(timer);
-  }, [value]);
+  }, [value, branch]);
 
   // Close on outside click
   useEffect(() => {
