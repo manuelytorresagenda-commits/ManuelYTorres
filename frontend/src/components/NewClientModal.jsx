@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "./ui/dialog";
 import { createClient } from "../lib/api";
+import { useAuth } from "../context/AuthContext";
 import { toast } from "sonner";
 import { X, Instagram, Music2, Cake, UserCheck, Phone } from "lucide-react";
 import ClientAutocomplete from "./ClientAutocomplete";
 
 export default function NewClientModal({ open, onClose, onCreated }) {
+  const { branch } = useAuth();
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [instagram, setInstagram] = useState("");
@@ -37,6 +39,7 @@ export default function NewClientModal({ open, onClose, onCreated }) {
         instagram: instagram.trim(),
         tiktok: tiktok.trim(),
         birthday: birthday.trim(),
+        branch_id: branch?.id || null,
       });
       toast.success(`Cliente guardada exitosamente: ${name}`);
       onCreated && onCreated();
