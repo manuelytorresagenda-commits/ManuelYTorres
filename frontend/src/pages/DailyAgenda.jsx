@@ -524,7 +524,7 @@ export default function DailyAgenda() {
                                   >
                                     <div>
                                       <div className="flex items-center justify-between gap-2">
-                                        <span className="font-mono-label text-[9px] font-bold text-black">
+                                        <span className="font-mono-label text-[9px] font-bold text-current">
                                           {a.start_time} — {a.end_time}
                                         </span>
                                         <div className="flex items-center gap-1">
@@ -549,16 +549,16 @@ export default function DailyAgenda() {
                                           </span>
                                         </div>
                                       </div>
-                                      <div className="font-serif-display text-lg font-bold leading-tight break-words text-black mt-1">
+                                      <div className="font-serif-display text-lg font-bold leading-tight break-words text-current mt-1">
                                         {a.client_name}
                                       </div>
-                                      <div className="text-xs font-semibold opacity-90 leading-snug mt-0.5">
+                                      <div className="text-xs font-semibold opacity-90 leading-snug mt-0.5 text-current">
                                         {serviceLabel}
                                       </div>
                                       {Array.isArray(a.additional_services) && a.additional_services.length > 0 && (
                                         <ul
                                           data-testid={`extras-list-${a.id}`}
-                                          className="text-[11px] font-medium opacity-90 list-disc list-inside space-y-0.5 leading-tight pl-1 mt-1"
+                                          className="text-[11px] font-medium opacity-90 list-disc list-inside space-y-0.5 leading-tight pl-1 mt-1 text-current"
                                         >
                                           {a.additional_services.map((ex, i) => (
                                             <li key={ex.id || `${ex.name}-${i}`} className="break-words">
@@ -585,7 +585,7 @@ export default function DailyAgenda() {
                                         <button
                                           onClick={() => changeStatus(a.id, "Finalizada")}
                                           data-testid={`finish-${a.id}`}
-                                          className="btn-invert border border-current px-2 py-1 font-mono-label text-[9px] font-bold hover:bg-white hover:text-black flex items-center gap-1"
+                                          className="btn-invert border border-white text-white px-2 py-1 font-mono-label text-[9px] font-bold hover:bg-white hover:text-black flex items-center gap-1"
                                         >
                                           <CheckCircle2 className="w-2.5 h-2.5" strokeWidth={2} />{" "}
                                           Finalizar
