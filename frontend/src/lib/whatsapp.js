@@ -5,7 +5,7 @@
 // enough data (e.g. missing phone).
 
 const DAYS_LONG_ES = [
-  "domingo", "lunes", "martes", "mi\u00e9rcoles", "jueves", "viernes", "s\u00e1bado",
+  "domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado",
 ];
 const MONTHS_LONG_ES = [
   "enero", "febrero", "marzo", "abril", "mayo", "junio",
@@ -41,18 +41,18 @@ export function buildBookingWhatsappUrl({
   const branchLine = branchName || "Manuel & Torres";
 
   const lines = [
-    `\u00a1Hola ${firstName}!`,
+    `¡Hola ${firstName}!`,
     "",
-    `Tu cita en *${branchLine}* qued\u00f3 *agendada* \u2713`,
+    `Tu cita en *${branchLine}* quedó *agendada* ✓`,
     "",
     `Fecha: ${formatLongDate(date)}`,
-    `Hora: ${startTime}${endTime ? ` - ${endTime}` : ""}`,
+    `Hora: ${startTime}`,
     serviceName ? `Servicio: ${serviceName}` : null,
-    specialistName ? `Te atender\u00e1: ${specialistName}` : null,
-    receptionistName ? `Le agend\u00f3: ${receptionistName}` : null,
+    specialistName ? `Te atenderá: ${specialistName}` : null,
+    receptionistName ? `Le agendó: ${receptionistName}` : null,
     "",
-    "Si necesitas reagendar, cont\u00e1ctanos con tiempo.",
-    "\u00a1Te esperamos!",
+    "Si necesitas reagendar, contáctanos con tiempo.",
+    "¡Te esperamos!",
   ].filter((x) => x !== null);
 
   const text = encodeURIComponent(lines.join("\n"));
@@ -90,26 +90,26 @@ export function buildRescheduleWhatsappUrl({
   const branchLine = branchName || "Manuel & Torres";
 
   const lines = [
-    `\u00a1Hola ${firstName}!`,
+    `¡Hola ${firstName}!`,
     "",
-    `Tu cita en *${branchLine}* fue *reagendada con \u00e9xito* \u2713`,
+    `Tu cita en *${branchLine}* fue *reagendada con éxito* ✓`,
     "",
     "*NUEVOS DETALLES:*",
     `Fecha: ${formatLongDate(date)}`,
-    `Hora: ${startTime}${endTime ? ` - ${endTime}` : ""}`,
+    `Hora: ${startTime}`,
     serviceName ? `Servicio: ${serviceName}` : null,
-    specialistName ? `Te atender\u00e1: ${specialistName}` : null,
-    receptionistName ? `Le agend\u00f3: ${receptionistName}` : null,
+    specialistName ? `Te atenderá: ${specialistName}` : null,
+    receptionistName ? `Le agendó: ${receptionistName}` : null,
   ];
   if (previousDate && previousStartTime) {
     lines.push("");
     lines.push(
-      `_(Anteriormente: ${formatLongDate(previousDate)} \u00b7 ${previousStartTime}${previousEndTime ? ` - ${previousEndTime}` : ""})_`
+      `_(Anteriormente: ${formatLongDate(previousDate)} · ${previousStartTime})_`
     );
   }
   lines.push("");
-  lines.push("Si necesitas otro cambio, cont\u00e1ctanos con tiempo.");
-  lines.push("\u00a1Te esperamos!");
+  lines.push("Si necesitas otro cambio, contáctanos con tiempo.");
+  lines.push("¡Te esperamos!");
 
   const text = encodeURIComponent(lines.filter((x) => x !== null).join("\n"));
   return `https://wa.me/${digits}?text=${text}`;
