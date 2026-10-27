@@ -67,26 +67,61 @@ export const fetchCoverages = (params = {}) => api.get("/coverages", { params })
 export const createCoverage = (data) => api.post("/coverages", data).then((r) => r.data);
 export const deleteCoverage = (id) => api.delete(`/coverages/${id}`).then((r) => r.data);
 
-// Bloqueos de Horario / Descansos / Capacitaciones en UN SOLO BLOQUE UNIFICADO
-export const createBlockSchedule = (data) => {
+// Bloqueos de Horario / Descansos / Capacitaciones en un SOLO bloque
+export const createBlockSchedule = async (data) => {
   const targetDate = data.start_date || data.date;
   const isBreak = data.type === "descanso";
   const title = isBreak ? "☕ DESCANSO" : "🎓 CAPACITACIÓN";
   const detail = data.reason ? ` (${data.reason})` : "";
 
-  // Se envía end_time directo y NO se especifica service_id para que el backend no calcule la duración de 30 min por defecto
+  // 1. Obtener la lista de servicios para extraer un service_id real que acepte la API
+  let serviceId = data.service_id || "";
+  let serviceName = isBreak ? "Descanso" : "Capacitación";
+
+  try {
+    const servicesList = await fetchServices();
+    if (servicesList && servicesList.length > 0) {
+      // Intentar encontrar un servicio que se llame Bloqueo/Descanso/Capacitación o usar el primero existente
+      const match = servicesList.find((s) => 
+        s.name.toLowerCase().includes("descanso") || 
+        s.name.toLowerCase().includes("bloqueo") || 
+        s.name.toLowerCase().includes("capacitacion")
+      );
+      const selectedService = match || servicesList[0];
+      serviceId = selectedService.id;
+      if (selectedService.name) serviceName = selectedService.name;
+    }
+  } catch (e) {
+    console.warn("No se pudieron cargar servicios para el bloqueo", e);
+  }
+
+  // Fallback si no hay ningún servicio registrado
+  const finalServiceId = serviceId || "000000000000000000000000";
+
+  // 2. Calcular la duración total en minutos para que no lo corte a 30 min
+  const [startH, startM] = (data.start_time || "09:00").split(":").map(Number);
+  const [endH, endM] = (data.end_time || "14:00").split(":").map(Number);
+  const totalMinutes = Math.max((endH * 60 + endM) - (startH * 60 + startM), 30);
+
+  // 3. Payload enviando service_id + end_time + duration_minutes
   const payload = {
     specialist_id: data.specialist_id,
     date: targetDate,
     start_time: data.start_time,
     end_time: data.end_time,
+    duration_minutes: totalMinutes,
+    duration: totalMinutes,
     client_name: `${title}${detail}`,
     client_phone: "0000000000",
     status: "Confirmada",
     is_overbooked: false,
     is_floating: false,
     notes: data.reason || title,
-    custom_service_name: isBreak ? "Bloqueo de Descanso" : "Bloqueo de Capacitación",
+    service_id: finalServiceId,
+    services: [finalServiceId],
+    service_ids: [finalServiceId],
+    custom_service_name: serviceName,
+    additional_services: [],
   };
 
   return api.post("/appointments", payload).then((r) => r.data);
