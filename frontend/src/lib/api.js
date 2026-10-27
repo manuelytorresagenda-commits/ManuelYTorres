@@ -66,3 +66,16 @@ export const deleteVacationDay = (id, date) =>
 export const fetchCoverages = (params = {}) => api.get("/coverages", { params }).then((r) => r.data);
 export const createCoverage = (data) => api.post("/coverages", data).then((r) => r.data);
 export const deleteCoverage = (id) => api.delete(`/coverages/${id}`).then((r) => r.data);
+
+// Bloqueos de Horario / Descansos / Capacitaciones
+export const createBlockSchedule = (data) =>
+  api
+    .post("/vacations", {
+      specialist_id: data.specialist_id,
+      start_date: data.date,
+      end_date: data.date,
+      start_time: data.start_time,
+      end_time: data.end_time,
+      reason: `${data.type === "descanso" ? "☕ DESCANSO" : "🎓 CAPACITACIÓN"}${data.reason ? `: ${data.reason}` : ""}`,
+    })
+    .then((r) => r.data);
