@@ -35,6 +35,8 @@ function startOfWeek(d) {
 
 const DAYS_ES = ["LUN", "MAR", "MIÉ", "JUE", "VIE", "SÁB", "DOM"];
 
+const BLOCK_STYLES = "bg-neutral-900 border-2 border-black text-white";
+
 const PHYSICAL_ORDER_PROVIDENCIA = [
   "manuel",
   "claudia",
@@ -93,12 +95,12 @@ export default function WeeklyAgenda() {
         fetchVacations({ week_start: ws, branch_id: branch.id }),
         fetchCoverages({ week_start: ws, target_branch_id: branch.id }),
       ]);
-      setAppointments(a);
-      setSpecialists(sp);
-      setAllSpecialistsList(allSp);
-      setServices(sv);
-      setVacations(v);
-      setCoverages(cov);
+      setAppointments(a || []);
+      setSpecialists(sp || []);
+      setAllSpecialistsList(allSp || []);
+      setServices(sv || []);
+      setVacations(v || []);
+      setCoverages(cov || []);
     } catch { 
       toast.error("Error cargando datos"); 
     } finally { 
@@ -116,7 +118,6 @@ export default function WeeklyAgenda() {
   };
   const goToday = () => setWeekStart(startOfWeek(new Date()));
 
-  // Consolidar especialistas de planta + apoyos/invitados y ordenar según la sucursal
   const activeSpecialistsList = useMemo(() => {
     const list = [...specialists];
     coverages.forEach((c) => {
@@ -148,7 +149,6 @@ export default function WeeklyAgenda() {
 
     const isProvidencia = (branch?.name || "").toLowerCase().includes("providencia");
 
-    // SI ES PROVIDENCIA: Forzar el orden estricto de la libreta de Providencia
     if (isProvidencia) {
       return list.sort((a, b) => {
         const nameA = (a.name || "").toLowerCase();
@@ -163,7 +163,6 @@ export default function WeeklyAgenda() {
       });
     }
 
-    // SI ES CUALQUIER OTRA SUCURSAL: Respeta el orden de la base de datos o alfabético normal
     return list.sort((a, b) => {
       const orderA = typeof a.order === "number" ? a.order : 999;
       const orderB = typeof b.order === "number" ? b.order : 999;
@@ -237,10 +236,10 @@ export default function WeeklyAgenda() {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm("¿Eliminar esta cita?")) return;
+    if (!window.confirm("¿Eliminar este registro?")) return;
     try {
       await deleteAppointment(id);
-      toast.success("Cita eliminada");
+      toast.success("Eliminado correctamente");
       load();
     } catch {
       toast.error("No se pudo eliminar");
@@ -255,17 +254,9 @@ export default function WeeklyAgenda() {
         return;
       }
       const vac = isSpecialistOnVacation(filterSpecialist, dateStr);
-      if (vac) {
-        if (!vac.start_time || !vac.end_time) {
-          toast.error(`El especialista no está disponible (${vac.reason || "Vacaciones"}).`);
-          return;
-        }
-        const vacStart = timeToMin(vac.start_time);
-        const vacEnd = timeToMin(vac.end_time);
-        if (slotMin >= vacStart && slotMin < vacEnd) {
-          toast.error(`Horario bloqueado: ${vac.reason || "Descanso/Capacitación"}.`);
-          return;
-        }
+      if (vac && (!vac.start_time || !vac.end_time)) {
+        toast.error(`El especialista no está disponible (${vac.reason || "Vacaciones"}).`);
+        return;
       }
     }
     setModalDate(dateStr);
@@ -398,8 +389,8 @@ export default function WeeklyAgenda() {
                         </div>
                         <div className="font-serif-display text-2xl font-bold leading-none mt-1">{d.getDate()}</div>
                         
-                        {/* Pastilla de vacaciones */}
-                        {spVac && (
+                        {/* Pastilla de vacaciones si es de todo el día */}
+                        {spVac && (!spVac.start_time || !spVac.end_time) && (
                           <div className="mt-2 flex items-center justify-between bg-neutral-200 border border-black/40 px-2 py-1">
                             <span className="font-mono-label text-[8px] font-bold uppercase truncate text-black">
                               🌴 {spVac.reason || "Vacaciones"}
@@ -446,22 +437,10 @@ export default function WeeklyAgenda() {
                       const selectedSp = filterSpecialist !== "all" ? findSp(filterSpecialist) : null;
                       const isCoverageInactive = selectedSp?.is_coverage && !isSpecialistActiveOnDate(selectedSp, ds);
 
-                      // Evaluar si esta celda cae dentro del rango de horario del bloqueo
-                      let isBlockedSlot = false;
-                      if (spVac) {
-                        if (!spVac.start_time || !spVac.end_time) {
-                          isBlockedSlot = true;
-                        } else {
-                          const vacStart = timeToMin(spVac.start_time);
-                          const vacEnd = timeToMin(spVac.end_time);
-                          if (slotMin >= vacStart && slotMin < vacEnd) {
-                            isBlockedSlot = true;
-                          }
-                        }
-                      }
+                      // Solo se bloquea la celda completa si la ausencia es de TODO el día (vacaciones)
+                      const isFullDayVacation = spVac && (!spVac.start_time || !spVac.end_time);
 
-                      // Si está fuera de cobertura o bloqueado en esta hora específica
-                      if (isCoverageInactive || isBlockedSlot) {
+                      if (isCoverageInactive || isFullDayVacation) {
                         return (
                           <td
                             key={i}
@@ -474,13 +453,7 @@ export default function WeeklyAgenda() {
                           >
                             <div className="w-full h-full border border-dashed border-neutral-300 flex items-center justify-center">
                               <span className="font-mono-label text-[8px] font-bold text-neutral-400 uppercase tracking-wider">
-                                {isCoverageInactive
-                                  ? "SIN COBERTURA"
-                                  : spVac?.reason?.includes("DESCANSO")
-                                  ? "☕ DESCANSO"
-                                  : spVac?.reason?.includes("CAPACITACIÓN")
-                                  ? "🎓 CAPACITACIÓN"
-                                  : "NO DISPONIBLE"}
+                                {isCoverageInactive ? "SIN COBERTURA" : "🌴 AUSENTE"}
                               </span>
                             </div>
                           </td>
@@ -519,7 +492,11 @@ export default function WeeklyAgenda() {
                               {apptList.map((a) => {
                                 const sv = findSv(a.service_id);
                                 const sp = findSp(a.specialist_id);
-                                const cls = a.is_floating
+                                const isBlock = a.client_name?.includes("DESCANSO") || a.client_name?.includes("CAPACITACIÓN");
+
+                                const cls = isBlock
+                                  ? BLOCK_STYLES
+                                  : a.is_floating
                                   ? "bg-sky-50 border-2 border-sky-800 border-dashed text-black"
                                   : a.is_overbooked
                                   ? "bg-amber-50 border-2 border-black border-dashed text-black"
@@ -528,9 +505,13 @@ export default function WeeklyAgenda() {
                                   : a.status === "Finalizada"
                                   ? "bg-neutral-200 border-2 border-neutral-500 text-neutral-700 line-through"
                                   : "bg-white border-2 border-black text-black";
-                                const serviceLabel = a.is_floating
+
+                                const serviceLabel = isBlock
+                                  ? a.custom_service_name || "HORARIO BLOQUEADO"
+                                  : a.is_floating
                                   ? a.custom_service_name
                                   : (sv?.name || "—");
+
                                 return (
                                   <div
                                     key={a.id}
@@ -544,12 +525,17 @@ export default function WeeklyAgenda() {
                                           {a.start_time}–{a.end_time}
                                         </span>
                                         <div className="flex items-center gap-1">
+                                          {isBlock && (
+                                            <span className="font-mono-label text-[7px] font-bold bg-white text-black px-1 border border-black">
+                                              BLOQUEO
+                                            </span>
+                                          )}
                                           {a.is_floating && (
                                             <span className="font-mono-label text-[7px] font-bold bg-sky-400 text-black px-1 border border-black">
                                               FLOT
                                             </span>
                                           )}
-                                          {a.is_overbooked && !a.is_floating && (
+                                          {a.is_overbooked && !a.is_floating && !isBlock && (
                                             <span
                                               data-testid={`extra-badge-${a.id}`}
                                               className="font-mono-label text-[7px] font-bold bg-amber-400 text-black px-1 border border-black"
@@ -557,9 +543,6 @@ export default function WeeklyAgenda() {
                                               EXTRA
                                             </span>
                                           )}
-                                          <span className="font-mono-label text-[8px] font-bold opacity-90">
-                                            {a.status}
-                                          </span>
                                         </div>
                                       </div>
                                       <div className="font-serif-display text-base font-bold leading-tight break-words mt-1">
@@ -584,7 +567,7 @@ export default function WeeklyAgenda() {
                                         className="flex flex-wrap gap-1"
                                         onClick={(e) => e.stopPropagation()}
                                       >
-                                        {a.status === "Confirmada" && (
+                                        {!isBlock && a.status === "Confirmada" && (
                                           <button
                                             onClick={() => changeStatus(a.id, "En curso")}
                                             data-testid={`week-start-${a.id}`}
@@ -593,7 +576,7 @@ export default function WeeklyAgenda() {
                                             <Play className="w-2 h-2" strokeWidth={2} /> Iniciar
                                           </button>
                                         )}
-                                        {a.status === "En curso" && (
+                                        {!isBlock && a.status === "En curso" && (
                                           <button
                                             onClick={() => changeStatus(a.id, "Finalizada")}
                                             data-testid={`week-finish-${a.id}`}
