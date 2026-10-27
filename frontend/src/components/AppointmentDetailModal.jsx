@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "./ui/dialog";
 import { updateAppointmentExtras, updateAppointment } from "../lib/api";
 import { toast } from "sonner";
-import { X, Plus, Trash2, Instagram, Music2, Cake, CalendarClock, Pencil, Save, UserCheck } from "lucide-react";
+import { X, Plus, Trash2, Instagram, Music2, Cake, CalendarClock, Pencil, Save, UserCheck, MessageCircle } from "lucide-react";
 import RescheduleModal from "./RescheduleModal";
 
 export default function AppointmentDetailModal({
@@ -46,6 +46,54 @@ export default function AppointmentDetailModal({
   }, [open, appointment]);
 
   if (!appointment) return null;
+
+  const isBlock =
+    appointment.client_name?.includes("DESCANSO") ||
+    appointment.client_name?.includes("CAPACITACIÓN");
+
+  const handleSendWhatsAppReminder = () => {
+    const rawPhone = appointment.client_phone || editForm.client_phone || "";
+    const cleanPhone = rawPhone.replace(/\D/g, "");
+
+    if (!cleanPhone || cleanPhone.length < 10) {
+      toast.error("La cita no tiene un número de teléfono válido registrado.");
+      return;
+    }
+
+    const phoneWithCountry = cleanPhone.length === 10 ? `52${cleanPhone}` : cleanPhone;
+
+    let dateFormatted = appointment.date;
+    try {
+      if (appointment.date) {
+        dateFormatted = new Date(`${appointment.date}T00:00:00`).toLocaleDateString("es-MX", {
+          weekday: "long",
+          day: "numeric",
+          month: "long",
+        });
+      }
+    } catch {
+      dateFormatted = appointment.date;
+    }
+
+    const serviceName =
+      appointment.is_floating
+        ? appointment.custom_service_name
+        : service?.name || appointment.custom_service_name || "Servicio";
+    const specialistName = specialist?.name || "Especialista";
+
+    const text = `¡Hola, ${appointment.client_name}! ✨ Te saludamos de *Manuel & Torres*.
+Te enviamos este mensaje para recordarte tu cita programada:
+
+📅 *Fecha:* ${dateFormatted}
+⏰ *Hora:* ${appointment.start_time} hrs
+💇‍♀️ *Servicio:* ${serviceName}
+👤 *Atiende:* ${specialistName}
+
+¿Nos confirmas tu asistencia? ¡Te esperamos! 💆‍♀️✨`;
+
+    const encodedText = encodeURIComponent(text);
+    window.open(`https://wa.me/${phoneWithCountry}?text=${encodedText}`, "_blank");
+  };
 
   const persistExtras = async (next) => {
     setSaving(true);
@@ -122,7 +170,7 @@ export default function AppointmentDetailModal({
             )}
           </div>
           <div className="flex items-center gap-2">
-            {!isEditing ? (
+            {!isEditing && !isBlock && (
               <button
                 type="button"
                 onClick={() => setIsEditing(true)}
@@ -132,7 +180,9 @@ export default function AppointmentDetailModal({
                 <Pencil className="w-3 h-3" strokeWidth={1.5} />
                 EDITAR
               </button>
-            ) : (
+            )}
+
+            {isEditing && (
               <button
                 type="button"
                 onClick={handleSaveFields}
@@ -144,7 +194,7 @@ export default function AppointmentDetailModal({
               </button>
             )}
 
-            {appointment.status !== "Finalizada" && !isEditing && (
+            {appointment.status !== "Finalizada" && !isEditing && !isBlock && (
               <button
                 type="button"
                 data-testid="detail-reschedule-btn"
@@ -168,7 +218,7 @@ export default function AppointmentDetailModal({
           </div>
         </div>
 
-        <div className="p-6 space-y-5">
+        <div className="p-6 space-y-4">
           {/* Cita info */}
           <div className="border border-neutral-200 p-4 space-y-2.5" data-testid="detail-info">
             <div className="flex justify-between items-center text-xs">
@@ -186,7 +236,7 @@ export default function AppointmentDetailModal({
               <span className="text-xs">
                 {appointment.is_floating
                   ? appointment.custom_service_name
-                  : (service?.name || "—")}
+                  : (service?.name || appointment.custom_service_name || "—")}
               </span>
             </div>
 
@@ -329,79 +379,95 @@ export default function AppointmentDetailModal({
             )}
           </div>
 
-          {/* Extras */}
-          <div data-testid="extras-section">
-            <div className="flex items-center justify-between mb-3">
-              <div className="font-mono-label text-[10px] text-neutral-500">
-                SERVICIOS ADICIONALES
-              </div>
-              <span className="font-mono-label text-[9px] text-neutral-400">
-                {extras.length} ITEM{extras.length === 1 ? "" : "S"}
-              </span>
-            </div>
-
-            {extras.length === 0 ? (
-              <div
-                data-testid="extras-empty"
-                className="text-xs text-neutral-500 border border-dashed border-neutral-300 p-3 mb-3"
-              >
-                Sin extras. Añada uno abajo.
-              </div>
-            ) : (
-              <ul className="space-y-1 mb-3" data-testid="extras-list">
-                {extras.map((e, idx) => (
-                  <li
-                    key={e.id || `${e.name}-${idx}`}
-                    data-testid={`extra-item-${idx}`}
-                    className="flex items-center justify-between border border-neutral-200 px-3 py-2"
-                  >
-                    <span className="text-sm flex items-center gap-2">
-                      <span className="w-1 h-1 bg-black rounded-full inline-block" />
-                      {e.name}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => removeExtra(idx)}
-                      data-testid={`remove-extra-${idx}`}
-                      disabled={saving}
-                      className="btn-invert border border-neutral-300 p-1.5 hover:bg-black hover:text-white disabled:opacity-50"
-                      aria-label="Eliminar extra"
-                    >
-                      <Trash2 className="w-3 h-3" strokeWidth={1.5} />
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-
-            {/* Add new */}
-            <div className="flex gap-2">
-              <input
-                data-testid="new-extra-input"
-                type="text"
-                value={newExtra}
-                onChange={(e) => setNewExtra(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    addExtra();
-                  }
-                }}
-                placeholder="Ej. Ampolleta, Peinado..."
-                className="flex-1 border border-black px-3 py-2 bg-white outline-none focus:ring-1 focus:ring-black focus:ring-offset-2 text-sm"
-              />
+          {/* Botón de Enviar Recordatorio por WhatsApp */}
+          {!isBlock && (
+            <div>
               <button
                 type="button"
-                data-testid="add-extra-btn"
-                onClick={addExtra}
-                disabled={saving || !newExtra.trim()}
-                className="btn-invert border border-black bg-black text-white px-4 font-mono-label text-[10px] hover:bg-white hover:text-black disabled:opacity-50 flex items-center gap-1"
+                onClick={handleSendWhatsAppReminder}
+                className="w-full border-2 border-emerald-600 bg-emerald-500 text-white font-mono-label text-xs font-bold py-2.5 px-4 hover:bg-emerald-600 transition-colors flex items-center justify-center gap-2 shadow-sm"
               >
-                <Plus className="w-3 h-3" strokeWidth={2} />
-                AÑADIR
+                <MessageCircle className="w-4 h-4" strokeWidth={2.5} />
+                RECORDATORIO POR WHATSAPP
               </button>
             </div>
-          </div>
+          )}
+
+          {/* Extras */}
+          {!isBlock && (
+            <div data-testid="extras-section">
+              <div className="flex items-center justify-between mb-3">
+                <div className="font-mono-label text-[10px] text-neutral-500">
+                  SERVICIOS ADICIONALES
+                </div>
+                <span className="font-mono-label text-[9px] text-neutral-400">
+                  {extras.length} ITEM{extras.length === 1 ? "" : "S"}
+                </span>
+              </div>
+
+              {extras.length === 0 ? (
+                <div
+                  data-testid="extras-empty"
+                  className="text-xs text-neutral-500 border border-dashed border-neutral-300 p-3 mb-3"
+                >
+                  Sin extras. Añada uno abajo.
+                </div>
+              ) : (
+                <ul className="space-y-1 mb-3" data-testid="extras-list">
+                  {extras.map((e, idx) => (
+                    <li
+                      key={e.id || `${e.name}-${idx}`}
+                      data-testid={`extra-item-${idx}`}
+                      className="flex items-center justify-between border border-neutral-200 px-3 py-2"
+                    >
+                      <span className="text-sm flex items-center gap-2">
+                        <span className="w-1 h-1 bg-black rounded-full inline-block" />
+                        {e.name}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => removeExtra(idx)}
+                        data-testid={`remove-extra-${idx}`}
+                        disabled={saving}
+                        className="btn-invert border border-neutral-300 p-1.5 hover:bg-black hover:text-white disabled:opacity-50"
+                        aria-label="Eliminar extra"
+                      >
+                        <Trash2 className="w-3 h-3" strokeWidth={1.5} />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              {/* Add new */}
+              <div className="flex gap-2">
+                <input
+                  data-testid="new-extra-input"
+                  type="text"
+                  value={newExtra}
+                  onChange={(e) => setNewExtra(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      addExtra();
+                    }
+                  }}
+                  placeholder="Ej. Ampolleta, Peinado..."
+                  className="flex-1 border border-black px-3 py-2 bg-white outline-none focus:ring-1 focus:ring-black focus:ring-offset-2 text-sm"
+                />
+                <button
+                  type="button"
+                  data-testid="add-extra-btn"
+                  onClick={addExtra}
+                  disabled={saving || !newExtra.trim()}
+                  className="btn-invert border border-black bg-black text-white px-4 font-mono-label text-[10px] hover:bg-white hover:text-black disabled:opacity-50 flex items-center gap-1"
+                >
+                  <Plus className="w-3 h-3" strokeWidth={2} />
+                  AÑADIR
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </DialogContent>
 
