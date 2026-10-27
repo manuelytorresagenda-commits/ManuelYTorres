@@ -235,8 +235,16 @@ export default function DailyAgenda() {
   const openModal = (specialistId, slotMin) => {
     const vac = getSpecialistVacation(specialistId);
     if (vac) {
-      toast.error(`El especialista no está disponible hoy (${vac.reason || "Vacaciones"}).`);
-      return;
+      if (!vac.start_time || !vac.end_time) {
+        toast.error(`El especialista no está disponible hoy (${vac.reason || "Vacaciones"}).`);
+        return;
+      }
+      const vacStart = timeToMin(vac.start_time);
+      const vacEnd = timeToMin(vac.end_time);
+      if (slotMin >= vacStart && slotMin < vacEnd) {
+        toast.error(`Horario bloqueado: ${vac.reason || "Descanso/Capacitación"}.`);
+        return;
+      }
     }
     setModalSpecialistId(specialistId);
     setModalStartTime(minToTime(slotMin));
@@ -472,17 +480,31 @@ export default function DailyAgenda() {
                     {visibleSpecialists.map((sp) => {
                       const vac = getSpecialistVacation(sp.id);
 
-                      // Si está de vacaciones hoy, celda limpia de bloqueo
+                      // Evaluar si esta celda cae dentro del rango de horario del bloqueo
+                      let isBlockedSlot = false;
                       if (vac) {
+                        if (!vac.start_time || !vac.end_time) {
+                          isBlockedSlot = true;
+                        } else {
+                          const vacStart = timeToMin(vac.start_time);
+                          const vacEnd = timeToMin(vac.end_time);
+                          if (slotMin >= vacStart && slotMin < vacEnd) {
+                            isBlockedSlot = true;
+                          }
+                        }
+                      }
+
+                      // Si está bloqueado en esta hora específica
+                      if (isBlockedSlot) {
                         return (
                           <td
                             key={sp.id}
                             className="border-r border-b border-neutral-300 p-1.5 h-10 bg-neutral-100/60 cursor-not-allowed select-none"
-                            title={`${vac.reason || "Vacaciones"} (${vac.start_date} a ${vac.end_date})`}
+                            title={`${vac.reason || "No disponible"}`}
                           >
                             <div className="w-full h-full border border-dashed border-neutral-300 flex items-center justify-center">
                               <span className="font-mono-label text-[8px] font-bold text-neutral-400 uppercase tracking-wider">
-                                NO DISPONIBLE
+                                {vac.reason?.includes("DESCANSO") ? "☕ DESCANSO" : vac.reason?.includes("CAPACITACIÓN") ? "🎓 CAPACITACIÓN" : "NO DISPONIBLE"}
                               </span>
                             </div>
                           </td>
