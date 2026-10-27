@@ -67,70 +67,27 @@ export const fetchCoverages = (params = {}) => api.get("/coverages", { params })
 export const createCoverage = (data) => api.post("/coverages", data).then((r) => r.data);
 export const deleteCoverage = (id) => api.delete(`/coverages/${id}`).then((r) => r.data);
 
-// Auxiliar: convierte "HH:MM" a minutos y viceversa
-const timeToMin = (t) => {
-  const [h, m] = t.split(":").map(Number);
-  return h * 60 + m;
-};
-
-const minToTime = (min) => {
-  const h = Math.floor(min / 60);
-  const m = min % 60;
-  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
-};
-
-// Bloqueos de Horario / Descansos / Capacitaciones divididos en slots de 30 min
-export const createBlockSchedule = async (data) => {
+// Bloqueos de Horario / Descansos / Capacitaciones en UN SOLO BLOQUE UNIFICADO
+export const createBlockSchedule = (data) => {
   const targetDate = data.start_date || data.date;
   const isBreak = data.type === "descanso";
   const title = isBreak ? "☕ DESCANSO" : "🎓 CAPACITACIÓN";
   const detail = data.reason ? ` (${data.reason})` : "";
 
-  // 1. Obtener ID de servicio base para la API
-  let validServiceId = data.service_id || "";
-  if (!validServiceId) {
-    try {
-      const servicesList = await fetchServices();
-      if (servicesList && servicesList.length > 0) {
-        validServiceId = servicesList[0].id;
-      }
-    } catch (e) {
-      console.warn("No se pudieron obtener servicios", e);
-    }
-  }
+  // Se envía end_time directo y NO se especifica service_id para que el backend no calcule la duración de 30 min por defecto
+  const payload = {
+    specialist_id: data.specialist_id,
+    date: targetDate,
+    start_time: data.start_time,
+    end_time: data.end_time,
+    client_name: `${title}${detail}`,
+    client_phone: "0000000000",
+    status: "Confirmada",
+    is_overbooked: false,
+    is_floating: false,
+    notes: data.reason || title,
+    custom_service_name: isBreak ? "Bloqueo de Descanso" : "Bloqueo de Capacitación",
+  };
 
-  const fallbackId = validServiceId || "000000000000000000000000";
-
-  // 2. Calcular todos los sub-bloques de 30 minutos entre start_time y end_time
-  const startMin = timeToMin(data.start_time || "09:00");
-  const endMin = timeToMin(data.end_time || "13:00");
-
-  const requests = [];
-
-  for (let current = startMin; current < endMin; current += 30) {
-    const slotStart = minToTime(current);
-    const slotEnd = minToTime(current + 30);
-
-    const payload = {
-      specialist_id: data.specialist_id,
-      date: targetDate,
-      start_time: slotStart,
-      end_time: slotEnd,
-      client_name: `${title}${detail}`,
-      client_phone: "0000000000",
-      status: "Confirmada",
-      is_overbooked: false,
-      is_floating: false,
-      notes: data.reason || title,
-      service_id: fallbackId,
-      services: [fallbackId],
-      service_ids: [fallbackId],
-      custom_service_name: isBreak ? "Bloqueo de Descanso" : "Bloqueo de Capacitación",
-      additional_services: [],
-    };
-
-    requests.push(api.post("/appointments", payload));
-  }
-
-  return Promise.all(requests);
+  return api.post("/appointments", payload).then((r) => r.data);
 };
