@@ -67,13 +67,27 @@ export const fetchCoverages = (params = {}) => api.get("/coverages", { params })
 export const createCoverage = (data) => api.post("/coverages", data).then((r) => r.data);
 export const deleteCoverage = (id) => api.delete(`/coverages/${id}`).then((r) => r.data);
 
-// Bloqueos de Horario / Descansos / Capacitaciones
-export const createBlockSchedule = (data) => {
+// Bloqueos de Horario / Descansos / Capacitaciones guardados como Citas Ficticias
+export const createBlockSchedule = async (data) => {
   const targetDate = data.start_date || data.date;
   const isBreak = data.type === "descanso";
   const title = isBreak ? "☕ DESCANSO" : "🎓 CAPACITACIÓN";
   const detail = data.reason ? ` (${data.reason})` : "";
 
+  // 1. Obtener la lista de servicios para extraer un service_id válido si es necesario
+  let validServiceId = data.service_id || "";
+  if (!validServiceId) {
+    try {
+      const servicesList = await fetchServices();
+      if (servicesList && servicesList.length > 0) {
+        validServiceId = servicesList[0].id;
+      }
+    } catch (err) {
+      console.warn("No se pudieron cargar servicios para el bloqueo", err);
+    }
+  }
+
+  // 2. Crear la cita enviando service_id válido
   return api
     .post("/appointments", {
       specialist_id: data.specialist_id,
@@ -86,8 +100,9 @@ export const createBlockSchedule = (data) => {
       is_overbooked: false,
       is_floating: false,
       notes: data.reason || title,
-      service_id: null,
+      service_id: validServiceId || "block",
       custom_service_name: isBreak ? "Bloqueo de Descanso" : "Bloqueo de Capacitación",
+      additional_services: [],
     })
     .then((r) => r.data);
 };
