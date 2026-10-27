@@ -333,7 +333,6 @@ export default function DailyAgenda() {
         onChange={setFilterSpecialist}
       />
 
-      {/* Date picker strip */}
       <div className="px-6 lg:px-12 py-5 border-b border-neutral-300 flex items-center gap-4" data-testid="date-picker-strip">
         <Calendar className="w-3.5 h-3.5 text-black" strokeWidth={2} />
         <span className="font-mono-label text-[10px] font-bold text-black">Fecha</span>
@@ -354,7 +353,6 @@ export default function DailyAgenda() {
         </button>
       </div>
 
-      {/* Stats strip */}
       <div className="grid grid-cols-3 border-b border-black">
         {[
           { label: "Citas hoy", value: stats.total, testid: "stat-total" },
@@ -374,7 +372,6 @@ export default function DailyAgenda() {
         ))}
       </div>
 
-      {/* Excel-like timetable */}
       <div className="p-4 lg:p-6">
         {loading ? (
           <div className="text-center py-20 font-mono-label text-xs font-bold text-black">Cargando...</div>
@@ -472,8 +469,7 @@ export default function DailyAgenda() {
                       </td>
                       {visibleSpecialists.map((sp) => {
                         const spVacs = getSpecialistVacations(sp.id);
-                        
-                        // Buscar si existe un bloqueo activo en esta hora específica
+
                         const activeBlock = spVacs.find((v) => {
                           if (!v.start_time || !v.end_time) return true;
                           const vStart = timeToMin(v.start_time);
