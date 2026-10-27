@@ -22,7 +22,7 @@ import {
 import { useAuth } from "../context/AuthContext";
 import { ChevronLeft, ChevronRight, Plus, Wind, UserPlus, Trash2, Play, CheckCircle2, Palmtree, Users, Clock } from "lucide-react";
 import { toast } from "sonner";
-import { SLOTS, minToTime, buildOverlapGrid } from "../lib/scheduling";
+import { SLOTS, timeToMin, minToTime, buildOverlapGrid } from "../lib/scheduling";
 
 function startOfWeek(d) {
   const date = new Date(d);
@@ -256,8 +256,16 @@ export default function WeeklyAgenda() {
       }
       const vac = isSpecialistOnVacation(filterSpecialist, dateStr);
       if (vac) {
-        toast.error(`El especialista no está disponible (${vac.reason || "Vacaciones"}).`);
-        return;
+        if (!vac.start_time || !vac.end_time) {
+          toast.error(`El especialista no está disponible (${vac.reason || "Vacaciones"}).`);
+          return;
+        }
+        const vacStart = timeToMin(vac.start_time);
+        const vacEnd = timeToMin(vac.end_time);
+        if (slotMin >= vacStart && slotMin < vacEnd) {
+          toast.error(`Horario bloqueado: ${vac.reason || "Descanso/Capacitación"}.`);
+          return;
+        }
       }
     }
     setModalDate(dateStr);
@@ -438,17 +446,41 @@ export default function WeeklyAgenda() {
                       const selectedSp = filterSpecialist !== "all" ? findSp(filterSpecialist) : null;
                       const isCoverageInactive = selectedSp?.is_coverage && !isSpecialistActiveOnDate(selectedSp, ds);
 
-                      // Si está de vacaciones o el apoyo no aplica para este día
-                      if (spVac || isCoverageInactive) {
+                      // Evaluar si esta celda cae dentro del rango de horario del bloqueo
+                      let isBlockedSlot = false;
+                      if (spVac) {
+                        if (!spVac.start_time || !spVac.end_time) {
+                          isBlockedSlot = true;
+                        } else {
+                          const vacStart = timeToMin(spVac.start_time);
+                          const vacEnd = timeToMin(spVac.end_time);
+                          if (slotMin >= vacStart && slotMin < vacEnd) {
+                            isBlockedSlot = true;
+                          }
+                        }
+                      }
+
+                      // Si está fuera de cobertura o bloqueado en esta hora específica
+                      if (isCoverageInactive || isBlockedSlot) {
                         return (
                           <td
                             key={i}
                             className="border-b border-r border-neutral-300 p-1.5 h-10 bg-neutral-100/60 cursor-not-allowed select-none"
-                            title={spVac ? `${spVac.reason || "Vacaciones"}` : "Estilista fuera de periodo de apoyo"}
+                            title={
+                              isCoverageInactive
+                                ? "Estilista fuera de periodo de apoyo"
+                                : spVac?.reason || "No disponible"
+                            }
                           >
                             <div className="w-full h-full border border-dashed border-neutral-300 flex items-center justify-center">
                               <span className="font-mono-label text-[8px] font-bold text-neutral-400 uppercase tracking-wider">
-                                NO DISPONIBLE
+                                {isCoverageInactive
+                                  ? "SIN COBERTURA"
+                                  : spVac?.reason?.includes("DESCANSO")
+                                  ? "☕ DESCANSO"
+                                  : spVac?.reason?.includes("CAPACITACIÓN")
+                                  ? "🎓 CAPACITACIÓN"
+                                  : "NO DISPONIBLE"}
                               </span>
                             </div>
                           </td>
