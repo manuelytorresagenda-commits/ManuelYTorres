@@ -52,16 +52,19 @@ export default function BlockScheduleModal({
 
     const startTime = blockType === "descanso" ? selectedBreak.start : customStart;
     const endTime = blockType === "descanso" ? selectedBreak.end : customEnd;
-    const finalReason =
-      reason.trim() || (blockType === "descanso" ? "Descanso" : "Capacitación");
+    
+    // Etiqueta formal para garantizar el match en el renderizado de la tabla
+    const tag = blockType === "descanso" ? "DESCANSO" : "CAPACITACIÓN";
+    const finalReason = reason.trim() ? `${tag}: ${reason.trim()}` : tag;
 
     setLoading(true);
     try {
       await createBlockSchedule({
         specialist_id: specialistId,
-        date: selectedDate,
-        start_time: startTime,
-        end_time: endTime,
+        start_date: selectedDate, // 'start_date' en lugar de 'date'
+        end_date: selectedDate,   // 'end_date' para delimitar el día exacto
+        start_time: startTime,    // '09:00'
+        end_time: endTime,        // '14:00'
         type: blockType,
         reason: finalReason,
       });
