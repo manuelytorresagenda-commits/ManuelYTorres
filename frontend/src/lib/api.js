@@ -70,20 +70,24 @@ export const deleteCoverage = (id) => api.delete(`/coverages/${id}`).then((r) =>
 // Bloqueos de Horario / Descansos / Capacitaciones
 export const createBlockSchedule = (data) => {
   const targetDate = data.start_date || data.date;
-  const tag = data.type === "descanso" ? "DESCANSO" : "CAPACITACIÓN";
-  const rawReason = data.reason || "";
-  const formattedReason = rawReason.includes(tag)
-    ? rawReason
-    : `${tag}${rawReason ? `: \${rawReason}` : ""}`;
+  const isBreak = data.type === "descanso";
+  const title = isBreak ? "☕ DESCANSO" : "🎓 CAPACITACIÓN";
+  const detail = data.reason ? ` (${data.reason})` : "";
 
   return api
-    .post("/vacations", {
+    .post("/appointments", {
       specialist_id: data.specialist_id,
-      start_date: targetDate,
-      end_date: targetDate,
+      date: targetDate,
       start_time: data.start_time,
       end_time: data.end_time,
-      reason: formattedReason,
+      client_name: `${title}${detail}`,
+      client_phone: "0000000000",
+      status: "Confirmada",
+      is_overbooked: false,
+      is_floating: false,
+      notes: data.reason || title,
+      service_id: null,
+      custom_service_name: isBreak ? "Bloqueo de Descanso" : "Bloqueo de Capacitación",
     })
     .then((r) => r.data);
 };
