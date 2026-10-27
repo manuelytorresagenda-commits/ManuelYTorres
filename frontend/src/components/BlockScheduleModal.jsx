@@ -30,7 +30,6 @@ export default function BlockScheduleModal({
   const [reason, setReason] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // Sincronizar la fecha cuando abre el modal o cambia la prop
   useEffect(() => {
     if (date) {
       setSelectedDate(date);
@@ -52,21 +51,17 @@ export default function BlockScheduleModal({
 
     const startTime = blockType === "descanso" ? selectedBreak.start : customStart;
     const endTime = blockType === "descanso" ? selectedBreak.end : customEnd;
-    
-    // Etiqueta formal para garantizar el match en el renderizado de la tabla
-    const tag = blockType === "descanso" ? "DESCANSO" : "CAPACITACIÓN";
-    const finalReason = reason.trim() ? `${tag}: ${reason.trim()}` : tag;
 
     setLoading(true);
     try {
       await createBlockSchedule({
         specialist_id: specialistId,
-        start_date: selectedDate, // 'start_date' en lugar de 'date'
-        end_date: selectedDate,   // 'end_date' para delimitar el día exacto
-        start_time: startTime,    // '09:00'
-        end_time: endTime,        // '14:00'
+        start_date: selectedDate,
+        end_date: selectedDate,
+        start_time: startTime,
+        end_time: endTime,
         type: blockType,
-        reason: finalReason,
+        reason: reason.trim(),
       });
 
       toast.success(
@@ -100,7 +95,6 @@ export default function BlockScheduleModal({
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Selector de Tipo */}
           <div className="grid grid-cols-2 gap-2 p-1 bg-neutral-100 border border-black">
             <button
               type="button"
@@ -126,7 +120,6 @@ export default function BlockScheduleModal({
             </button>
           </div>
 
-          {/* Fecha y Especialista */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block font-mono-label text-[10px] font-bold text-black uppercase mb-1 flex items-center gap-1">
@@ -161,7 +154,6 @@ export default function BlockScheduleModal({
             </div>
           </div>
 
-          {/* Opciones de Descanso Fijo */}
           {blockType === "descanso" ? (
             <div>
               <label className="block font-mono-label text-[10px] font-bold text-black uppercase mb-1">
@@ -185,7 +177,6 @@ export default function BlockScheduleModal({
               </div>
             </div>
           ) : (
-            /* Horario Libre para Capacitación */
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block font-mono-label text-[10px] font-bold text-black uppercase mb-1">
@@ -214,7 +205,6 @@ export default function BlockScheduleModal({
             </div>
           )}
 
-          {/* Motivo Opcional */}
           <div>
             <label className="block font-mono-label text-[10px] font-bold text-black uppercase mb-1">
               Nota / Detalle (Opcional)
