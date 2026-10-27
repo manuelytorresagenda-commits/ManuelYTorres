@@ -56,8 +56,7 @@ export default function BlockScheduleModal({
     try {
       await createBlockSchedule({
         specialist_id: specialistId,
-        start_date: selectedDate,
-        end_date: selectedDate,
+        date: selectedDate,
         start_time: startTime,
         end_time: endTime,
         type: blockType,
