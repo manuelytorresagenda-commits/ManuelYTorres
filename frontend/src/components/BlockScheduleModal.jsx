@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { X, Clock, GraduationCap, Coffee } from "lucide-react";
+import { useState, useEffect } from "react";
+import { X, GraduationCap, Coffee, Calendar } from "lucide-react";
 import { toast } from "sonner";
 import { createBlockSchedule } from "../lib/api";
 
@@ -21,11 +21,21 @@ export default function BlockScheduleModal({
 }) {
   const [blockType, setBlockType] = useState("descanso");
   const [specialistId, setSpecialistId] = useState(initialSpecialistId);
+  const [selectedDate, setSelectedDate] = useState(
+    date || new Date().toISOString().slice(0, 10)
+  );
   const [selectedBreak, setSelectedBreak] = useState(FIXED_BREAKS[0]);
   const [customStart, setCustomStart] = useState("09:00");
   const [customEnd, setCustomEnd] = useState("12:00");
   const [reason, setReason] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // Sincronizar la fecha cuando abre el modal o cambia la prop
+  useEffect(() => {
+    if (date) {
+      setSelectedDate(date);
+    }
+  }, [date, open]);
 
   if (!open) return null;
 
@@ -33,6 +43,10 @@ export default function BlockScheduleModal({
     e.preventDefault();
     if (!specialistId) {
       toast.error("Seleccione una especialista");
+      return;
+    }
+    if (!selectedDate) {
+      toast.error("Seleccione una fecha");
       return;
     }
 
@@ -45,7 +59,7 @@ export default function BlockScheduleModal({
     try {
       await createBlockSchedule({
         specialist_id: specialistId,
-        date,
+        date: selectedDate,
         start_time: startTime,
         end_time: endTime,
         type: blockType,
@@ -109,24 +123,39 @@ export default function BlockScheduleModal({
             </button>
           </div>
 
-          {/* Especialista */}
-          <div>
-            <label className="block font-mono-label text-[10px] font-bold text-black uppercase mb-1">
-              Especialista
-            </label>
-            <select
-              value={specialistId}
-              onChange={(e) => setSpecialistId(e.target.value)}
-              className="w-full border border-black p-2 font-mono-label text-xs bg-white text-black focus:outline-none"
-              required
-            >
-              <option value="">Seleccione especialista...</option>
-              {specialists.map((sp) => (
-                <option key={sp.id} value={sp.id}>
-                  {sp.name} {sp.specialty ? `(${sp.specialty})` : ""}
-                </option>
-              ))}
-            </select>
+          {/* Fecha y Especialista */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block font-mono-label text-[10px] font-bold text-black uppercase mb-1 flex items-center gap-1">
+                <Calendar className="w-3 h-3" /> Fecha
+              </label>
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                className="w-full border border-black p-2 font-mono-label text-xs bg-white text-black focus:outline-none"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block font-mono-label text-[10px] font-bold text-black uppercase mb-1">
+                Especialista
+              </label>
+              <select
+                value={specialistId}
+                onChange={(e) => setSpecialistId(e.target.value)}
+                className="w-full border border-black p-2 font-mono-label text-xs bg-white text-black focus:outline-none"
+                required
+              >
+                <option value="">Seleccione...</option>
+                {specialists.map((sp) => (
+                  <option key={sp.id} value={sp.id}>
+                    {sp.name}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
           {/* Opciones de Descanso Fijo */}
