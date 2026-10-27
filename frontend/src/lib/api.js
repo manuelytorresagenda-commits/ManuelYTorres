@@ -67,50 +67,37 @@ export const fetchCoverages = (params = {}) => api.get("/coverages", { params })
 export const createCoverage = (data) => api.post("/coverages", data).then((r) => r.data);
 export const deleteCoverage = (id) => api.delete(`/coverages/${id}`).then((r) => r.data);
 
-// Bloqueos de Horario / Descansos / Capacitaciones en un SOLO bloque
+// Bloqueos de Horario: Crear cita y forzar end_time con PUT posterior
 export const createBlockSchedule = async (data) => {
   const targetDate = data.start_date || data.date;
   const isBreak = data.type === "descanso";
   const title = isBreak ? "☕ DESCANSO" : "🎓 CAPACITACIÓN";
   const detail = data.reason ? ` (${data.reason})` : "";
 
-  // 1. Obtener la lista de servicios para extraer un service_id real que acepte la API
+  // 1. Obtener un service_id real
   let serviceId = data.service_id || "";
-  let serviceName = isBreak ? "Descanso" : "Capacitación";
-
   try {
     const servicesList = await fetchServices();
     if (servicesList && servicesList.length > 0) {
-      // Intentar encontrar un servicio que se llame Bloqueo/Descanso/Capacitación o usar el primero existente
       const match = servicesList.find((s) => 
         s.name.toLowerCase().includes("descanso") || 
         s.name.toLowerCase().includes("bloqueo") || 
         s.name.toLowerCase().includes("capacitacion")
       );
-      const selectedService = match || servicesList[0];
-      serviceId = selectedService.id;
-      if (selectedService.name) serviceName = selectedService.name;
+      serviceId = (match || servicesList[0]).id;
     }
   } catch (e) {
-    console.warn("No se pudieron cargar servicios para el bloqueo", e);
+    console.warn("No se pudieron obtener servicios", e);
   }
 
-  // Fallback si no hay ningún servicio registrado
   const finalServiceId = serviceId || "000000000000000000000000";
 
-  // 2. Calcular la duración total en minutos para que no lo corte a 30 min
-  const [startH, startM] = (data.start_time || "09:00").split(":").map(Number);
-  const [endH, endM] = (data.end_time || "14:00").split(":").map(Number);
-  const totalMinutes = Math.max((endH * 60 + endM) - (startH * 60 + startM), 30);
-
-  // 3. Payload enviando service_id + end_time + duration_minutes
+  // 2. Crear cita inicial
   const payload = {
     specialist_id: data.specialist_id,
     date: targetDate,
     start_time: data.start_time,
     end_time: data.end_time,
-    duration_minutes: totalMinutes,
-    duration: totalMinutes,
     client_name: `${title}${detail}`,
     client_phone: "0000000000",
     status: "Confirmada",
@@ -118,11 +105,22 @@ export const createBlockSchedule = async (data) => {
     is_floating: false,
     notes: data.reason || title,
     service_id: finalServiceId,
-    services: [finalServiceId],
-    service_ids: [finalServiceId],
-    custom_service_name: serviceName,
-    additional_services: [],
+    custom_service_name: isBreak ? "Bloqueo de Descanso" : "Bloqueo de Capacitación",
   };
 
-  return api.post("/appointments", payload).then((r) => r.data);
+  const createdAppt = await api.post("/appointments", payload).then((r) => r.data);
+
+  // 3. Forzar actualización de end_time si el backend la recortó a 30 min
+  if (createdAppt && createdAppt.id && createdAppt.end_time !== data.end_time) {
+    try {
+      await api.put(`/appointments/${createdAppt.id}`, {
+        ...createdAppt,
+        end_time: data.end_time,
+      });
+    } catch (e) {
+      console.warn("No se pudo forzar el end_time vía PUT", e);
+    }
+  }
+
+  return createdAppt;
 };
