@@ -67,42 +67,46 @@ export const fetchCoverages = (params = {}) => api.get("/coverages", { params })
 export const createCoverage = (data) => api.post("/coverages", data).then((r) => r.data);
 export const deleteCoverage = (id) => api.delete(`/coverages/${id}`).then((r) => r.data);
 
-// Bloqueos de Horario / Descansos / Capacitaciones guardados como Citas Ficticias
+// Bloqueos de Horario / Descansos / Capacitaciones FORZADOS
 export const createBlockSchedule = async (data) => {
   const targetDate = data.start_date || data.date;
   const isBreak = data.type === "descanso";
   const title = isBreak ? "☕ DESCANSO" : "🎓 CAPACITACIÓN";
   const detail = data.reason ? ` (${data.reason})` : "";
 
-  // 1. Obtener la lista de servicios para extraer un service_id válido si es necesario
-  let validServiceId = data.service_id || "";
-  if (!validServiceId) {
-    try {
-      const servicesList = await fetchServices();
-      if (servicesList && servicesList.length > 0) {
-        validServiceId = servicesList[0].id;
-      }
-    } catch (err) {
-      console.warn("No se pudieron cargar servicios para el bloqueo", err);
+  // 1. Obtener un servicio real de la sucursal para que la API no llore
+  let firstService = null;
+  try {
+    const servicesList = await fetchServices();
+    if (servicesList && servicesList.length > 0) {
+      firstService = servicesList[0];
     }
+  } catch (e) {
+    console.warn("No se pudieron obtener servicios", e);
   }
 
-  // 2. Crear la cita enviando service_id válido
-  return api
-    .post("/appointments", {
-      specialist_id: data.specialist_id,
-      date: targetDate,
-      start_time: data.start_time,
-      end_time: data.end_time,
-      client_name: `${title}${detail}`,
-      client_phone: "0000000000",
-      status: "Confirmada",
-      is_overbooked: false,
-      is_floating: false,
-      notes: data.reason || title,
-      service_id: validServiceId || "block",
-      custom_service_name: isBreak ? "Bloqueo de Descanso" : "Bloqueo de Capacitación",
-      additional_services: [],
-    })
-    .then((r) => r.data);
+  const validId = firstService?.id || "000000000000000000000000";
+
+  // 2. Mandamos todos los formatos imaginables de 'service' para satisfacer cualquier esquema Pydantic/Mongoose
+  const payload = {
+    specialist_id: data.specialist_id,
+    date: targetDate,
+    start_time: data.start_time,
+    end_time: data.end_time,
+    client_name: `${title}${detail}`,
+    client_phone: "0000000000",
+    status: "Confirmada",
+    is_overbooked: false,
+    is_floating: false,
+    notes: data.reason || title,
+    
+    // Inyección de campos para pasar el requerimiento de servicio de la API
+    service_id: validId,
+    services: [validId],
+    service_ids: [validId],
+    custom_service_name: isBreak ? "Bloqueo de Descanso" : "Bloqueo de Capacitación",
+    additional_services: [],
+  };
+
+  return api.post("/appointments", payload).then((r) => r.data);
 };
