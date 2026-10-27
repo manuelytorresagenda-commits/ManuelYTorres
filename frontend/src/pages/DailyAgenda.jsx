@@ -85,18 +85,18 @@ export default function DailyAgenda() {
       const [a, sp, allSp, sv, v, cov] = await Promise.all([
         fetchAppointments({ date, branch_id: branch.id }),
         fetchSpecialists({ branch_id: branch.id }),
-        fetchSpecialists(), // todos los especialistas para mapear nombres de apoyos internos
+        fetchSpecialists(),
         fetchServices({ branch_id: branch.id }),
         fetchVacations({ date, branch_id: branch.id }),
         fetchCoverages({ date, target_branch_id: branch.id }),
       ]);
-      setAppointments(a);
-      setSpecialists(sp);
-      setAllSpecialistsList(allSp);
-      setServices(sv);
-      setVacations(v);
-      setCoverages(cov);
-    } catch (e) {
+      setAppointments(a || []);
+      setSpecialists(sp || []);
+      setAllSpecialistsList(allSp || []);
+      setServices(sv || []);
+      setVacations(v || []);
+      setCoverages(cov || []);
+    } catch {
       toast.error("Error cargando datos");
     } finally {
       setLoading(false);
@@ -105,7 +105,6 @@ export default function DailyAgenda() {
 
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [branch, date]);
 
-  // Consolidar especialistas de planta + apoyos/invitados activos en esta fecha y ordenar según la sucursal
   const activeSpecialistsList = useMemo(() => {
     const list = [...specialists];
     coverages.forEach((c) => {
@@ -135,7 +134,6 @@ export default function DailyAgenda() {
 
     const isProvidencia = (branch?.name || "").toLowerCase().includes("providencia");
 
-    // SI ES PROVIDENCIA: Forzar el orden estricto de la libreta de Providencia
     if (isProvidencia) {
       return list.sort((a, b) => {
         const nameA = (a.name || "").toLowerCase();
@@ -150,7 +148,6 @@ export default function DailyAgenda() {
       });
     }
 
-    // SI ES CUALQUIER OTRA SUCURSAL: Respeta el orden de la base de datos o alfabético normal
     return list.sort((a, b) => {
       const orderA = typeof a.order === "number" ? a.order : 999;
       const orderB = typeof b.order === "number" ? b.order : 999;
@@ -162,8 +159,8 @@ export default function DailyAgenda() {
   const findService = (id) => services.find((s) => s.id === id);
   const findSpecialist = (id) => activeSpecialistsList.find((s) => s.id === id) || allSpecialistsList.find((s) => s.id === id);
 
-  const getSpecialistVacation = (spId) => {
-    return vacations.find(
+  const getSpecialistVacations = (spId) => {
+    return vacations.filter(
       (v) => v.specialist_id === spId && v.start_date <= date && v.end_date >= date
     );
   };
@@ -233,19 +230,19 @@ export default function DailyAgenda() {
   };
 
   const openModal = (specialistId, slotMin) => {
-    const vac = getSpecialistVacation(specialistId);
-    if (vac) {
-      if (!vac.start_time || !vac.end_time) {
-        toast.error(`El especialista no está disponible hoy (${vac.reason || "Vacaciones"}).`);
-        return;
-      }
-      const vacStart = timeToMin(vac.start_time);
-      const vacEnd = timeToMin(vac.end_time);
-      if (slotMin >= vacStart && slotMin < vacEnd) {
-        toast.error(`Horario bloqueado: ${vac.reason || "Descanso/Capacitación"}.`);
-        return;
-      }
+    const spVacs = getSpecialistVacations(specialistId);
+    const blocked = spVacs.find((v) => {
+      if (!v.start_time || !v.end_time) return true;
+      const vStart = timeToMin(v.start_time);
+      const vEnd = timeToMin(v.end_time);
+      return slotMin >= vStart && slotMin < vEnd;
+    });
+
+    if (blocked) {
+      toast.error(`Horario no disponible (${blocked.reason || "Bloqueado"})`);
+      return;
     }
+
     setModalSpecialistId(specialistId);
     setModalStartTime(minToTime(slotMin));
     setModalOpen(true);
@@ -394,19 +391,18 @@ export default function DailyAgenda() {
             <table className="w-full border-collapse" data-testid="agenda-grid-table">
               <thead>
                 <tr>
-                  <th
-                    className="sticky top-0 left-0 z-30 bg-white border-r border-b border-black p-3 text-left font-mono-label text-[10px] font-bold text-black min-w-[90px]"
-                  >
+                  <th className="sticky top-0 left-0 z-30 bg-white border-r border-b border-black p-3 text-left font-mono-label text-[10px] font-bold text-black min-w-[90px]">
                     HORA
                   </th>
                   {visibleSpecialists.map((sp) => {
-                    const vac = getSpecialistVacation(sp.id);
+                    const spVacs = getSpecialistVacations(sp.id);
+                    const hasVac = spVacs.length > 0;
                     return (
                       <th
                         key={sp.id}
                         data-testid={`col-header-${sp.id}`}
                         className={`sticky top-0 z-20 border-r border-b border-black p-3 text-left min-w-[200px] ${
-                          vac ? "bg-neutral-100" : sp.is_coverage ? "bg-neutral-50" : "bg-white"
+                          hasVac ? "bg-neutral-100" : sp.is_coverage ? "bg-neutral-50" : "bg-white"
                         }`}
                       >
                         <div className="flex items-center gap-2">
@@ -446,9 +442,8 @@ export default function DailyAgenda() {
                           </div>
                         </div>
 
-                        {/* Pastilla de vacaciones con botón de papelera para cancelar este día puntual */}
-                        {vac && (
-                          <div className="mt-2 flex items-center justify-between bg-neutral-200 border border-black/50 px-2 py-1">
+                        {spVacs.map((vac) => (
+                          <div key={vac.id} className="mt-2 flex items-center justify-between bg-neutral-200 border border-black/50 px-2 py-1">
                             <span className="font-mono-label text-[8px] font-bold uppercase truncate">
                               🌴 {vac.reason || "Vacaciones"}
                             </span>
@@ -461,7 +456,7 @@ export default function DailyAgenda() {
                               <Trash2 className="w-2.5 h-2.5" strokeWidth={2} />
                             </button>
                           </div>
-                        )}
+                        ))}
                       </th>
                     );
                   })}
@@ -471,209 +466,190 @@ export default function DailyAgenda() {
                 {SLOTS.map((slotMin) => {
                   const timeLabel = minToTime(slotMin);
                   return (
-                  <tr key={slotMin} data-testid={`row-slot-${timeLabel}`}>
-                    <td
-                      className="sticky left-0 z-10 bg-white border-r border-b border-neutral-300 p-3 font-serif-display text-2xl font-bold text-black leading-none whitespace-nowrap align-middle"
-                    >
-                      {timeLabel}
-                    </td>
-                    {visibleSpecialists.map((sp) => {
-                      const vac = getSpecialistVacation(sp.id);
+                    <tr key={slotMin} data-testid={`row-slot-${timeLabel}`}>
+                      <td className="sticky left-0 z-10 bg-white border-r border-b border-neutral-300 p-3 font-serif-display text-2xl font-bold text-black leading-none whitespace-nowrap align-middle">
+                        {timeLabel}
+                      </td>
+                      {visibleSpecialists.map((sp) => {
+                        const spVacs = getSpecialistVacations(sp.id);
+                        
+                        // Buscar si existe un bloqueo activo en esta hora específica
+                        const activeBlock = spVacs.find((v) => {
+                          if (!v.start_time || !v.end_time) return true;
+                          const vStart = timeToMin(v.start_time);
+                          const vEnd = timeToMin(v.end_time);
+                          return slotMin >= vStart && slotMin < vEnd;
+                        });
 
-                      // Evaluar si esta celda cae dentro del rango de horario del bloqueo
-                      let isBlockedSlot = false;
-                      if (vac) {
-                        if (!vac.start_time || !vac.end_time) {
-                          isBlockedSlot = true;
-                        } else {
-                          const vacStart = timeToMin(vac.start_time);
-                          const vacEnd = timeToMin(vac.end_time);
-                          if (slotMin >= vacStart && slotMin < vacEnd) {
-                            isBlockedSlot = true;
-                          }
+                        if (activeBlock) {
+                          const r = (activeBlock.reason || "").toUpperCase();
+                          const isBreak = r.includes("DESCANSO");
+                          const isTraining = r.includes("CAPACITACIÓN");
+
+                          return (
+                            <td
+                              key={sp.id}
+                              className="border-r border-b border-neutral-300 p-1.5 h-10 bg-neutral-100/60 cursor-not-allowed select-none"
+                              title={activeBlock.reason || "No disponible"}
+                            >
+                              <div className="w-full h-full border border-dashed border-neutral-300 flex items-center justify-center">
+                                <span className="font-mono-label text-[8px] font-bold text-neutral-400 uppercase tracking-wider">
+                                  {isBreak ? "☕ DESCANSO" : isTraining ? "🎓 CAPACITACIÓN" : "NO DISPONIBLE"}
+                                </span>
+                              </div>
+                            </td>
+                          );
                         }
-                      }
 
-                      // Si está bloqueado en esta hora específica
-                      if (isBlockedSlot) {
-                        return (
-                          <td
-                            key={sp.id}
-                            className="border-r border-b border-neutral-300 p-1.5 h-10 bg-neutral-100/60 cursor-not-allowed select-none"
-                            title={`${vac.reason || "No disponible"}`}
-                          >
-                            <div className="w-full h-full border border-dashed border-neutral-300 flex items-center justify-center">
-                              <span className="font-mono-label text-[8px] font-bold text-neutral-400 uppercase tracking-wider">
-                                {vac.reason?.includes("DESCANSO") ? "☕ DESCANSO" : vac.reason?.includes("CAPACITACIÓN") ? "🎓 CAPACITACIÓN" : "NO DISPONIBLE"}
-                              </span>
-                            </div>
-                          </td>
-                        );
-                      }
+                        const cell = grid[sp.id];
+                        if (!cell) return null;
+                        if (cell.coveredSlots.has(slotMin)) return null;
 
-                      const cell = grid[sp.id];
-                      if (!cell) return null;
-                      if (cell.coveredSlots.has(slotMin)) {
-                        return null;
-                      }
-                      const cluster = cell.startsAt.get(slotMin);
-                      if (cluster && cluster.appts.length > 0) {
-                        const maxSpan = cluster.span;
-                        const groupCount = cluster.appts.length;
-                        return (
-                          <td
-                            key={sp.id}
-                            rowSpan={maxSpan}
-                            data-testid={`cell-${sp.id}-${timeLabel}`}
-                            className="border-r border-b border-neutral-300 p-1.5 relative h-1 align-stretch"
-                          >
-                            {groupCount > 1 && (
-                              <span
-                                data-testid={`cell-count-${sp.id}-${timeLabel}`}
-                                className="absolute top-1 right-1 z-10 font-mono-label text-[8px] font-bold bg-black text-white px-1.5 py-0.5 border border-black"
-                                aria-label={`${groupCount} citas en este bloque`}
-                              >
-                                ×{groupCount}
-                              </span>
-                            )}
-                            <div className="flex flex-col gap-1.5 h-full w-full">
-                              {cluster.appts.map((a) => {
-                                const sv = findService(a.service_id);
-                                const styles = a.is_floating
-                                  ? FLOATING_STYLES[a.status]
-                                  : a.is_overbooked
-                                  ? OVERBOOKED_STYLES[a.status]
-                                  : STATUS_STYLES[a.status];
-                                const serviceLabel = a.is_floating
-                                  ? a.custom_service_name
-                                  : (sv?.name || "—");
-                                return (
-                                  <div
-                                    key={a.id}
-                                    data-testid={`appointment-card-${a.id}`}
-                                    onClick={() => setDetailAppt(a)}
-                                    className={`group border-2 ${styles} p-3 flex-1 h-full w-full flex flex-col justify-between transition-colors cursor-pointer box-border`}
-                                  >
-                                    <div>
-                                      <div className="flex items-center justify-between gap-2">
-                                        <span className="font-mono-label text-[9px] font-bold text-current">
-                                          {a.start_time} — {a.end_time}
-                                        </span>
-                                        <div className="flex items-center gap-1">
-                                          {a.is_floating && (
-                                            <span
-                                              data-testid={`floating-badge-${a.id}`}
-                                              className="font-mono-label text-[8px] font-bold bg-sky-400 text-black px-1.5 py-0.5 border border-black"
-                                            >
-                                              FLOTANTE
-                                            </span>
-                                          )}
-                                          {a.is_overbooked && !a.is_floating && (
-                                            <span
-                                              data-testid={`extra-badge-${a.id}`}
-                                              className="font-mono-label text-[8px] font-bold bg-amber-400 text-black px-1.5 py-0.5 border border-black"
-                                            >
-                                              EXTRA
-                                            </span>
-                                          )}
-                                          <span className="font-mono-label text-[9px] font-bold opacity-90">
-                                            {a.status}
+                        const cluster = cell.startsAt.get(slotMin);
+                        if (cluster && cluster.appts.length > 0) {
+                          const maxSpan = cluster.span;
+                          const groupCount = cluster.appts.length;
+                          return (
+                            <td
+                              key={sp.id}
+                              rowSpan={maxSpan}
+                              data-testid={`cell-${sp.id}-${timeLabel}`}
+                              className="border-r border-b border-neutral-300 p-1.5 relative h-1 align-stretch"
+                            >
+                              {groupCount > 1 && (
+                                <span
+                                  data-testid={`cell-count-${sp.id}-${timeLabel}`}
+                                  className="absolute top-1 right-1 z-10 font-mono-label text-[8px] font-bold bg-black text-white px-1.5 py-0.5 border border-black"
+                                >
+                                  ×{groupCount}
+                                </span>
+                              )}
+                              <div className="flex flex-col gap-1.5 h-full w-full">
+                                {cluster.appts.map((a) => {
+                                  const sv = findService(a.service_id);
+                                  const styles = a.is_floating
+                                    ? FLOATING_STYLES[a.status]
+                                    : a.is_overbooked
+                                    ? OVERBOOKED_STYLES[a.status]
+                                    : STATUS_STYLES[a.status];
+                                  const serviceLabel = a.is_floating
+                                    ? a.custom_service_name
+                                    : (sv?.name || "—");
+                                  return (
+                                    <div
+                                      key={a.id}
+                                      data-testid={`appointment-card-${a.id}`}
+                                      onClick={() => setDetailAppt(a)}
+                                      className={`group border-2 ${styles} p-3 flex-1 h-full w-full flex flex-col justify-between transition-colors cursor-pointer box-border`}
+                                    >
+                                      <div>
+                                        <div className="flex items-center justify-between gap-2">
+                                          <span className="font-mono-label text-[9px] font-bold text-current">
+                                            {a.start_time} — {a.end_time}
                                           </span>
+                                          <div className="flex items-center gap-1">
+                                            {a.is_floating && (
+                                              <span
+                                                data-testid={`floating-badge-${a.id}`}
+                                                className="font-mono-label text-[8px] font-bold bg-sky-400 text-black px-1.5 py-0.5 border border-black"
+                                              >
+                                                FLOTANTE
+                                              </span>
+                                            )}
+                                            {a.is_overbooked && !a.is_floating && (
+                                              <span
+                                                data-testid={`extra-badge-${a.id}`}
+                                                className="font-mono-label text-[8px] font-bold bg-amber-400 text-black px-1.5 py-0.5 border border-black"
+                                              >
+                                                EXTRA
+                                              </span>
+                                            )}
+                                            <span className="font-mono-label text-[9px] font-bold opacity-90">
+                                              {a.status}
+                                            </span>
+                                          </div>
+                                        </div>
+                                        <div className="font-serif-display text-lg font-bold leading-tight break-words text-current mt-1">
+                                          {a.client_name}
+                                        </div>
+                                        <div className="text-xs font-semibold opacity-90 leading-snug mt-0.5 text-current">
+                                          {serviceLabel}
                                         </div>
                                       </div>
-                                      <div className="font-serif-display text-lg font-bold leading-tight break-words text-current mt-1">
-                                        {a.client_name}
-                                      </div>
-                                      <div className="text-xs font-semibold opacity-90 leading-snug mt-0.5 text-current">
-                                        {serviceLabel}
-                                      </div>
-                                      {Array.isArray(a.additional_services) && a.additional_services.length > 0 && (
-                                        <ul
-                                          data-testid={`extras-list-${a.id}`}
-                                          className="text-[11px] font-medium opacity-90 list-disc list-inside space-y-0.5 leading-tight pl-1 mt-1 text-current"
-                                        >
-                                          {a.additional_services.map((ex, i) => (
-                                            <li key={ex.id || `${ex.name}-${i}`} className="break-words">
-                                              {ex.name}
-                                            </li>
-                                          ))}
-                                        </ul>
-                                      )}
-                                    </div>
-                                    <div
-                                      className="flex flex-wrap gap-1 mt-auto pt-2"
-                                      onClick={(e) => e.stopPropagation()}
-                                    >
-                                      {a.status === "Confirmada" && (
-                                        <button
-                                          onClick={() => changeStatus(a.id, "En curso")}
-                                          data-testid={`start-${a.id}`}
-                                          className="btn-invert border border-current px-2 py-1 font-mono-label text-[9px] font-bold hover:bg-current hover:text-white flex items-center gap-1"
-                                        >
-                                          <Play className="w-2.5 h-2.5" strokeWidth={2} /> Iniciar
-                                        </button>
-                                      )}
-                                      {a.status === "En curso" && (
-                                        <button
-                                          onClick={() => changeStatus(a.id, "Finalizada")}
-                                          data-testid={`finish-${a.id}`}
-                                          className="btn-invert border border-white text-white px-2 py-1 font-mono-label text-[9px] font-bold hover:bg-white hover:text-black flex items-center gap-1"
-                                        >
-                                          <CheckCircle2 className="w-2.5 h-2.5" strokeWidth={2} />{" "}
-                                          Finalizar
-                                        </button>
-                                      )}
-                                      <button
-                                        onClick={() => handleDelete(a.id)}
-                                        data-testid={`delete-${a.id}`}
-                                        className="btn-invert border border-current/70 p-1 hover:bg-current hover:text-white"
-                                        aria-label="Eliminar"
+                                      <div
+                                        className="flex flex-wrap gap-1 mt-auto pt-2"
+                                        onClick={(e) => e.stopPropagation()}
                                       >
-                                        <Trash2 className="w-2.5 h-2.5" strokeWidth={2} />
-                                      </button>
+                                        {a.status === "Confirmada" && (
+                                          <button
+                                            onClick={() => changeStatus(a.id, "En curso")}
+                                            data-testid={`start-${a.id}`}
+                                            className="btn-invert border border-current px-2 py-1 font-mono-label text-[9px] font-bold hover:bg-current hover:text-white flex items-center gap-1"
+                                          >
+                                            <Play className="w-2.5 h-2.5" strokeWidth={2} /> Iniciar
+                                          </button>
+                                        )}
+                                        {a.status === "En curso" && (
+                                          <button
+                                            onClick={() => changeStatus(a.id, "Finalizada")}
+                                            data-testid={`finish-${a.id}`}
+                                            className="btn-invert border border-white text-white px-2 py-1 font-mono-label text-[9px] font-bold hover:bg-white hover:text-black flex items-center gap-1"
+                                          >
+                                            <CheckCircle2 className="w-2.5 h-2.5" strokeWidth={2} /> Finalizar
+                                          </button>
+                                        )}
+                                        <button
+                                          onClick={() => handleDelete(a.id)}
+                                          data-testid={`delete-${a.id}`}
+                                          className="btn-invert border border-current/70 p-1 hover:bg-current hover:text-white"
+                                          aria-label="Eliminar"
+                                        >
+                                          <Trash2 className="w-2.5 h-2.5" strokeWidth={2} />
+                                        </button>
+                                      </div>
                                     </div>
-                                  </div>
+                                  );
+                                })}
+                              </div>
+                            </td>
+                          );
+                        }
+
+                        return (
+                          <td
+                            key={sp.id}
+                            data-testid={`cell-${sp.id}-${timeLabel}`}
+                            className="border-r border-b border-neutral-300 p-2 h-10"
+                          >
+                            {(() => {
+                              const shiftStart = timeToMin(sp.start_time || "09:00");
+                              const shiftEnd = timeToMin(sp.end_time || "18:00");
+                              const outOfShift = slotMin < shiftStart || slotMin >= shiftEnd;
+                              if (outOfShift) {
+                                return (
+                                  <div
+                                    data-testid={`out-of-shift-${sp.id}-${timeLabel}`}
+                                    className="w-full h-full bg-neutral-100 border border-dashed border-neutral-300"
+                                    aria-label="Fuera de turno"
+                                  />
                                 );
-                              })}
-                            </div>
+                              }
+                              return (
+                                <button
+                                  type="button"
+                                  data-testid={`add-cell-${sp.id}-${timeLabel}`}
+                                  onClick={() => openModal(sp.id, slotMin)}
+                                  className="w-full h-full flex items-center justify-center text-neutral-500 hover:text-black hover:bg-neutral-100 border border-dashed border-neutral-300 hover:border-black transition-colors"
+                                  aria-label={`Agendar ${sp.name} a las ${timeLabel}`}
+                                >
+                                  <Plus className="w-4 h-4" strokeWidth={2} />
+                                </button>
+                              );
+                            })()}
                           </td>
                         );
-                      }
-                      return (
-                        <td
-                          key={sp.id}
-                          data-testid={`cell-${sp.id}-${timeLabel}`}
-                          className="border-r border-b border-neutral-300 p-2 h-10"
-                        >
-                          {(() => {
-                            const shiftStart = timeToMin(sp.start_time || "09:00");
-                            const shiftEnd = timeToMin(sp.end_time || "18:00");
-                            const outOfShift = slotMin < shiftStart || slotMin >= shiftEnd;
-                            if (outOfShift) {
-                              return (
-                                <div
-                                  data-testid={`out-of-shift-${sp.id}-${timeLabel}`}
-                                  className="w-full h-full bg-neutral-100 border border-dashed border-neutral-300"
-                                  aria-label="Fuera de turno"
-                                />
-                              );
-                            }
-                            return (
-                              <button
-                                type="button"
-                                data-testid={`add-cell-${sp.id}-${timeLabel}`}
-                                onClick={() => openModal(sp.id, slotMin)}
-                                className="w-full h-full flex items-center justify-center text-neutral-500 hover:text-black hover:bg-neutral-100 border border-dashed border-neutral-300 hover:border-black transition-colors"
-                                aria-label={`Agendar ${sp.name} a las ${timeLabel}`}
-                              >
-                                <Plus className="w-4 h-4" strokeWidth={2} />
-                              </button>
-                            );
-                          })()}
-                        </td>
-                      );
-                    })}
-                  </tr>
+                      })}
+                    </tr>
                   );
                 })}
               </tbody>
