@@ -81,15 +81,8 @@ export default function AppointmentDetailModal({
         : service?.name || appointment.custom_service_name || "Servicio";
     const specialistName = specialist?.name || "Especialista";
 
-    const text = `¡Hola, ${appointment.client_name}! ✨ Te saludamos de *Manuel & Torres*.
-Te enviamos este mensaje para recordarte tu cita programada:
-
-📅 *Fecha:* ${dateFormatted}
-⏰ *Hora:* ${appointment.start_time} hrs
-💇‍♀️ *Servicio:* ${serviceName}
-👤 *Atiende:* ${specialistName}
-
-¿Nos confirmas tu asistencia? ¡Te esperamos! 💆‍♀️✨`;
+    // Mensaje limpio y compatible con WhatsApp Web
+    const text = `¡Hola, ${appointment.client_name}! Te saludamos de *Manuel & Torres*.\n\nTe enviamos este mensaje para recordarte tu cita programada:\n\n• *Fecha:* ${dateFormatted}\n• *Hora:* ${appointment.start_time} hrs\n• *Servicio:* ${serviceName}\n• *Atiende:* ${specialistName}\n\n¿Nos confirmas tu asistencia? ¡Te esperamos!`;
 
     const encodedText = encodeURIComponent(text);
     window.open(`https://wa.me/${phoneWithCountry}?text=${encodedText}`, "_blank");
