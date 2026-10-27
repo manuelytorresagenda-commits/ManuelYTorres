@@ -67,14 +67,21 @@ export const fetchCoverages = (params = {}) => api.get("/coverages", { params })
 export const createCoverage = (data) => api.post("/coverages", data).then((r) => r.data);
 export const deleteCoverage = (id) => api.delete(`/coverages/${id}`).then((r) => r.data);
 
-// Bloqueos de Horario / Descansos / Capacitaciones FORZADOS
+// Bloqueos de Horario / Descansos / Capacitaciones FORZADOS CON DURACIÓN EXACTA
 export const createBlockSchedule = async (data) => {
   const targetDate = data.start_date || data.date;
   const isBreak = data.type === "descanso";
   const title = isBreak ? "☕ DESCANSO" : "🎓 CAPACITACIÓN";
   const detail = data.reason ? ` (${data.reason})` : "";
 
-  // 1. Obtener un servicio real de la sucursal para que la API no llore
+  // 1. Calcular la duración en minutos entre start_time y end_time
+  const [startH, startM] = (data.start_time || "09:00").split(":").map(Number);
+  const [endH, endM] = (data.end_time || "14:00").split(":").map(Number);
+  const startTotalMin = startH * 60 + startM;
+  const endTotalMin = endH * 60 + endM;
+  const calculatedDuration = Math.max(endTotalMin - startTotalMin, 30);
+
+  // 2. Obtener un servicio real de la sucursal para pasar la validación
   let firstService = null;
   try {
     const servicesList = await fetchServices();
@@ -87,20 +94,21 @@ export const createBlockSchedule = async (data) => {
 
   const validId = firstService?.id || "000000000000000000000000";
 
-  // 2. Mandamos todos los formatos imaginables de 'service' para satisfacer cualquier esquema Pydantic/Mongoose
+  // 3. Payload completo especificando la duración exacta en minutos
   const payload = {
     specialist_id: data.specialist_id,
     date: targetDate,
     start_time: data.start_time,
     end_time: data.end_time,
+    duration_minutes: calculatedDuration,
+    duration: calculatedDuration,
     client_name: `${title}${detail}`,
     client_phone: "0000000000",
     status: "Confirmada",
     is_overbooked: false,
     is_floating: false,
     notes: data.reason || title,
-    
-    // Inyección de campos para pasar el requerimiento de servicio de la API
+
     service_id: validId,
     services: [validId],
     service_ids: [validId],
