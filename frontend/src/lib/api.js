@@ -48,7 +48,7 @@ export const updateAppointmentExtras = (id, additional_services) => api.patch(`/
 export const rescheduleAppointment = (id, data) => api.post(`/appointments/${id}/reschedule`, data).then((r) => r.data);
 export const deleteAppointment = (id) => api.delete(`/appointments/${id}`).then((r) => r.data);
 
-// Clientes (Acepta string de búsqueda o params con branch_id)
+// Clientes
 export const fetchClients = (paramsOrQuery = {}) => {
   const params = typeof paramsOrQuery === "string" ? { q: paramsOrQuery } : paramsOrQuery;
   return api.get("/clients", { params }).then((r) => r.data);
@@ -68,14 +68,22 @@ export const createCoverage = (data) => api.post("/coverages", data).then((r) =>
 export const deleteCoverage = (id) => api.delete(`/coverages/${id}`).then((r) => r.data);
 
 // Bloqueos de Horario / Descansos / Capacitaciones
-export const createBlockSchedule = (data) =>
-  api
+export const createBlockSchedule = (data) => {
+  const targetDate = data.start_date || data.date;
+  const tag = data.type === "descanso" ? "DESCANSO" : "CAPACITACIÓN";
+  const rawReason = data.reason || "";
+  const formattedReason = rawReason.includes(tag)
+    ? rawReason
+    : `${tag}${rawReason ? `: \${rawReason}` : ""}`;
+
+  return api
     .post("/vacations", {
       specialist_id: data.specialist_id,
-      start_date: data.date,
-      end_date: data.date,
+      start_date: targetDate,
+      end_date: targetDate,
       start_time: data.start_time,
       end_time: data.end_time,
-      reason: `${data.type === "descanso" ? "☕ DESCANSO" : "🎓 CAPACITACIÓN"}${data.reason ? `: ${data.reason}` : ""}`,
+      reason: formattedReason,
     })
     .then((r) => r.data);
+};
