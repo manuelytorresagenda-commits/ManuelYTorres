@@ -42,6 +42,8 @@ const FLOATING_STYLES = {
   Finalizada: "bg-sky-50 border-neutral-500 text-neutral-700 line-through border-dashed",
 };
 
+const BLOCK_STYLES = "bg-neutral-900 border-2 border-black text-white";
+
 const PHYSICAL_ORDER_PROVIDENCIA = [
   "manuel",
   "claudia",
@@ -219,10 +221,10 @@ export default function DailyAgenda() {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm("¿Eliminar esta cita?")) return;
+    if (!window.confirm("¿Eliminar este registro?")) return;
     try {
       await deleteAppointment(id);
-      toast.success("Cita eliminada");
+      toast.success("Eliminado correctamente");
       load();
     } catch {
       toast.error("No se pudo eliminar");
@@ -231,15 +233,10 @@ export default function DailyAgenda() {
 
   const openModal = (specialistId, slotMin) => {
     const spVacs = getSpecialistVacations(specialistId);
-    const blocked = spVacs.find((v) => {
-      if (!v.start_time || !v.end_time) return true;
-      const vStart = timeToMin(v.start_time);
-      const vEnd = timeToMin(v.end_time);
-      return slotMin >= vStart && slotMin < vEnd;
-    });
+    const blockedFullDay = spVacs.find((v) => !v.start_time || !v.end_time);
 
-    if (blocked) {
-      toast.error(`Horario no disponible (${blocked.reason || "Bloqueado"})`);
+    if (blockedFullDay) {
+      toast.error(`Especialista ausente todo el día (${blockedFullDay.reason || "Vacaciones"})`);
       return;
     }
 
@@ -469,28 +466,20 @@ export default function DailyAgenda() {
                       </td>
                       {visibleSpecialists.map((sp) => {
                         const spVacs = getSpecialistVacations(sp.id);
+                        
+                        // Si está de vacaciones todo el día
+                        const fullDayVacation = spVacs.find((v) => !v.start_time || !v.end_time);
 
-                        const activeBlock = spVacs.find((v) => {
-                          if (!v.start_time || !v.end_time) return true;
-                          const vStart = timeToMin(v.start_time);
-                          const vEnd = timeToMin(v.end_time);
-                          return slotMin >= vStart && slotMin < vEnd;
-                        });
-
-                        if (activeBlock) {
-                          const r = (activeBlock.reason || "").toUpperCase();
-                          const isBreak = r.includes("DESCANSO");
-                          const isTraining = r.includes("CAPACITACIÓN");
-
+                        if (fullDayVacation) {
                           return (
                             <td
                               key={sp.id}
                               className="border-r border-b border-neutral-300 p-1.5 h-10 bg-neutral-100/60 cursor-not-allowed select-none"
-                              title={activeBlock.reason || "No disponible"}
+                              title={fullDayVacation.reason || "Vacaciones"}
                             >
                               <div className="w-full h-full border border-dashed border-neutral-300 flex items-center justify-center">
                                 <span className="font-mono-label text-[8px] font-bold text-neutral-400 uppercase tracking-wider">
-                                  {isBreak ? "☕ DESCANSO" : isTraining ? "🎓 CAPACITACIÓN" : "NO DISPONIBLE"}
+                                  🌴 {fullDayVacation.reason || "AUSENTE"}
                                 </span>
                               </div>
                             </td>
@@ -523,20 +512,28 @@ export default function DailyAgenda() {
                               <div className="flex flex-col gap-1.5 h-full w-full">
                                 {cluster.appts.map((a) => {
                                   const sv = findService(a.service_id);
-                                  const styles = a.is_floating
+                                  const isBlock = a.client_name?.includes("DESCANSO") || a.client_name?.includes("CAPACITACIÓN");
+                                  
+                                  const styles = isBlock
+                                    ? BLOCK_STYLES
+                                    : a.is_floating
                                     ? FLOATING_STYLES[a.status]
                                     : a.is_overbooked
                                     ? OVERBOOKED_STYLES[a.status]
                                     : STATUS_STYLES[a.status];
-                                  const serviceLabel = a.is_floating
+
+                                  const serviceLabel = isBlock
+                                    ? a.custom_service_name || "HORARIO BLOQUEADO"
+                                    : a.is_floating
                                     ? a.custom_service_name
                                     : (sv?.name || "—");
+
                                   return (
                                     <div
                                       key={a.id}
                                       data-testid={`appointment-card-${a.id}`}
                                       onClick={() => setDetailAppt(a)}
-                                      className={`group border-2 ${styles} p-3 flex-1 h-full w-full flex flex-col justify-between transition-colors cursor-pointer box-border`}
+                                      className={`group ${styles} p-3 flex-1 h-full w-full flex flex-col justify-between transition-colors cursor-pointer box-border`}
                                     >
                                       <div>
                                         <div className="flex items-center justify-between gap-2">
@@ -544,6 +541,11 @@ export default function DailyAgenda() {
                                             {a.start_time} — {a.end_time}
                                           </span>
                                           <div className="flex items-center gap-1">
+                                            {isBlock && (
+                                              <span className="font-mono-label text-[8px] font-bold bg-white text-black px-1.5 py-0.5 border border-black">
+                                                BLOQUEO
+                                              </span>
+                                            )}
                                             {a.is_floating && (
                                               <span
                                                 data-testid={`floating-badge-${a.id}`}
@@ -552,7 +554,7 @@ export default function DailyAgenda() {
                                                 FLOTANTE
                                               </span>
                                             )}
-                                            {a.is_overbooked && !a.is_floating && (
+                                            {a.is_overbooked && !a.is_floating && !isBlock && (
                                               <span
                                                 data-testid={`extra-badge-${a.id}`}
                                                 className="font-mono-label text-[8px] font-bold bg-amber-400 text-black px-1.5 py-0.5 border border-black"
@@ -560,9 +562,6 @@ export default function DailyAgenda() {
                                                 EXTRA
                                               </span>
                                             )}
-                                            <span className="font-mono-label text-[9px] font-bold opacity-90">
-                                              {a.status}
-                                            </span>
                                           </div>
                                         </div>
                                         <div className="font-serif-display text-lg font-bold leading-tight break-words text-current mt-1">
@@ -576,7 +575,7 @@ export default function DailyAgenda() {
                                         className="flex flex-wrap gap-1 mt-auto pt-2"
                                         onClick={(e) => e.stopPropagation()}
                                       >
-                                        {a.status === "Confirmada" && (
+                                        {!isBlock && a.status === "Confirmada" && (
                                           <button
                                             onClick={() => changeStatus(a.id, "En curso")}
                                             data-testid={`start-${a.id}`}
@@ -585,7 +584,7 @@ export default function DailyAgenda() {
                                             <Play className="w-2.5 h-2.5" strokeWidth={2} /> Iniciar
                                           </button>
                                         )}
-                                        {a.status === "En curso" && (
+                                        {!isBlock && a.status === "En curso" && (
                                           <button
                                             onClick={() => changeStatus(a.id, "Finalizada")}
                                             data-testid={`finish-${a.id}`}
