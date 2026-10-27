@@ -7,6 +7,7 @@ import AppointmentDetailModal from "../components/AppointmentDetailModal";
 import NewClientModal from "../components/NewClientModal";
 import VacationModal from "../components/VacationModal";
 import CoverageModal from "../components/CoverageModal";
+import BlockScheduleModal from "../components/BlockScheduleModal";
 import {
   fetchAppointments,
   fetchSpecialists,
@@ -19,7 +20,7 @@ import {
   deleteAppointment,
 } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
-import { Plus, Trash2, Play, CheckCircle2, Calendar, Wind, UserPlus, Palmtree, Users } from "lucide-react";
+import { Plus, Trash2, Play, CheckCircle2, Calendar, Wind, UserPlus, Palmtree, Users, Clock } from "lucide-react";
 import { toast } from "sonner";
 import { SLOTS, timeToMin, minToTime, buildOverlapGrid } from "../lib/scheduling";
 
@@ -71,6 +72,7 @@ export default function DailyAgenda() {
   const [clientModalOpen, setClientModalOpen] = useState(false);
   const [vacationModalOpen, setVacationModalOpen] = useState(false);
   const [coverageModalOpen, setCoverageModalOpen] = useState(false);
+  const [blockModalOpen, setBlockModalOpen] = useState(false);
   const [modalSpecialistId, setModalSpecialistId] = useState("");
   const [modalStartTime, setModalStartTime] = useState("");
   const [detailAppt, setDetailAppt] = useState(null);
@@ -268,6 +270,14 @@ export default function DailyAgenda() {
         }
         action={
           <div className="flex items-center gap-2">
+            <button
+              data-testid="header-block-schedule-btn"
+              onClick={() => setBlockModalOpen(true)}
+              className="btn-invert border border-black bg-white text-black px-4 py-3 font-mono-label text-[10px] font-bold hover:bg-neutral-100 flex items-center gap-2 transition-colors"
+            >
+              <Clock className="w-3 h-3" strokeWidth={2} />
+              Descanso / Capacitación
+            </button>
             <button
               data-testid="header-coverage-btn"
               onClick={() => setCoverageModalOpen(true)}
@@ -683,6 +693,14 @@ export default function DailyAgenda() {
         open={coverageModalOpen}
         onClose={() => setCoverageModalOpen(false)}
         onCreated={load}
+      />
+
+      <BlockScheduleModal
+        open={blockModalOpen}
+        onClose={() => setBlockModalOpen(false)}
+        onCreated={load}
+        specialists={activeSpecialistsList}
+        date={date}
       />
 
       <AppointmentDetailModal
