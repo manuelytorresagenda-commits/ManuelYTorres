@@ -67,54 +67,70 @@ export const fetchCoverages = (params = {}) => api.get("/coverages", { params })
 export const createCoverage = (data) => api.post("/coverages", data).then((r) => r.data);
 export const deleteCoverage = (id) => api.delete(`/coverages/${id}`).then((r) => r.data);
 
-// Bloqueos de Horario / Descansos / Capacitaciones FORZADOS CON DURACIÓN EXACTA
+// Auxiliar: convierte "HH:MM" a minutos y viceversa
+const timeToMin = (t) => {
+  const [h, m] = t.split(":").map(Number);
+  return h * 60 + m;
+};
+
+const minToTime = (min) => {
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+};
+
+// Bloqueos de Horario / Descansos / Capacitaciones divididos en slots de 30 min
 export const createBlockSchedule = async (data) => {
   const targetDate = data.start_date || data.date;
   const isBreak = data.type === "descanso";
   const title = isBreak ? "☕ DESCANSO" : "🎓 CAPACITACIÓN";
   const detail = data.reason ? ` (${data.reason})` : "";
 
-  // 1. Calcular la duración en minutos entre start_time y end_time
-  const [startH, startM] = (data.start_time || "09:00").split(":").map(Number);
-  const [endH, endM] = (data.end_time || "14:00").split(":").map(Number);
-  const startTotalMin = startH * 60 + startM;
-  const endTotalMin = endH * 60 + endM;
-  const calculatedDuration = Math.max(endTotalMin - startTotalMin, 30);
-
-  // 2. Obtener un servicio real de la sucursal para pasar la validación
-  let firstService = null;
-  try {
-    const servicesList = await fetchServices();
-    if (servicesList && servicesList.length > 0) {
-      firstService = servicesList[0];
+  // 1. Obtener ID de servicio base para la API
+  let validServiceId = data.service_id || "";
+  if (!validServiceId) {
+    try {
+      const servicesList = await fetchServices();
+      if (servicesList && servicesList.length > 0) {
+        validServiceId = servicesList[0].id;
+      }
+    } catch (e) {
+      console.warn("No se pudieron obtener servicios", e);
     }
-  } catch (e) {
-    console.warn("No se pudieron obtener servicios", e);
   }
 
-  const validId = firstService?.id || "000000000000000000000000";
+  const fallbackId = validServiceId || "000000000000000000000000";
 
-  // 3. Payload completo especificando la duración exacta en minutos
-  const payload = {
-    specialist_id: data.specialist_id,
-    date: targetDate,
-    start_time: data.start_time,
-    end_time: data.end_time,
-    duration_minutes: calculatedDuration,
-    duration: calculatedDuration,
-    client_name: `${title}${detail}`,
-    client_phone: "0000000000",
-    status: "Confirmada",
-    is_overbooked: false,
-    is_floating: false,
-    notes: data.reason || title,
+  // 2. Calcular todos los sub-bloques de 30 minutos entre start_time y end_time
+  const startMin = timeToMin(data.start_time || "09:00");
+  const endMin = timeToMin(data.end_time || "13:00");
 
-    service_id: validId,
-    services: [validId],
-    service_ids: [validId],
-    custom_service_name: isBreak ? "Bloqueo de Descanso" : "Bloqueo de Capacitación",
-    additional_services: [],
-  };
+  const requests = [];
 
-  return api.post("/appointments", payload).then((r) => r.data);
+  for (let current = startMin; current < endMin; current += 30) {
+    const slotStart = minToTime(current);
+    const slotEnd = minToTime(current + 30);
+
+    const payload = {
+      specialist_id: data.specialist_id,
+      date: targetDate,
+      start_time: slotStart,
+      end_time: slotEnd,
+      client_name: `${title}${detail}`,
+      client_phone: "0000000000",
+      status: "Confirmada",
+      is_overbooked: false,
+      is_floating: false,
+      notes: data.reason || title,
+      service_id: fallbackId,
+      services: [fallbackId],
+      service_ids: [fallbackId],
+      custom_service_name: isBreak ? "Bloqueo de Descanso" : "Bloqueo de Capacitación",
+      additional_services: [],
+    };
+
+    requests.push(api.post("/appointments", payload));
+  }
+
+  return Promise.all(requests);
 };
